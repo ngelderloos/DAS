@@ -12,7 +12,7 @@ total = 0.0
 average = 0.0
 
 def repeat():
-    rval, frame = capture.read()
+    frame = capture.grab()
     key = cv.waitKey(20)
 
 if __name__ == "__main__":
