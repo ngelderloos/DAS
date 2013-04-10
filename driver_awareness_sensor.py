@@ -4,8 +4,8 @@ import cv2.cv as cv
 import time
 import numpy as np
 
-cascade_fn = "./data/haarcascades/haarcascade_frontalface_alt.xml"
-nested_fn = "./data/haarcascades/haarcascade_eye.xml"
+face_cascade_fn = "./data/haarcascades/haarcascade_frontalface_alt.xml"
+eye_cascade_fn = "./data/haarcascades/haarcascade_eye.xml"
 
 SMOOTH_FACE_MAX = 10
 smooth_face_history = np.zeros((SMOOTH_FACE_MAX, 4), dtype=np.int32)
@@ -21,14 +21,26 @@ SHOW_SMOOTH = True
 # Return: rects, a list of rectangles, each represented as numpy.ndarray
 #-------------------------------------------------------------------------
 def detect_face(img, cascade):
+    
+    # detectMultiScale(image, rejectLevels, levelWeights[, scaleFactor[, minNeighbors[, flags[, minSize[, maxSize[, outputRejectLevels]]]]]]
+    # image - Matrix of the type CV_8U containing an image where objects are detected.
+    # rejectLevels - 
+    # levelWeights - 
+    # scaleFactor - Parameter specifying how mucht the image size is reduced at each image object.
+    # minNeighbors - Parameter specifying how many neighbors each candidate rectangle should have to retain it.
+    # flags - Parameter with the same meaning for an old cascade as in the function cvHaarDetectObjects. It is not used for a new cascade.
+    # minSize - Minimum possible object size. Objects smaller than that are ignored.
+    # maxSize - Maximum possible object size. Objects larger than that are ignored.
+    # outputRejectLevels - 
     rects = cascade.detectMultiScale(img, scaleFactor=1.3, minNeighbors=4, minSize=(100, 100), flags = cv.CV_HAAR_SCALE_IMAGE)
+    
     if len(rects) == 0:
         return []
     rects[:,2:] += rects[:,:2]
     return rects
 
 def detect_eyes(img, cascade):
-    rects = cascade.detectMultiScale(img, scaleFactor=1.3, minNeighbors=4, minSize=(50, 50), flags=cv.CV_HAAR_SCALE_IMAGE)
+    rects = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=4, minSize=(50, 50), flags=cv.CV_HAAR_SCALE_IMAGE)
     if len(rects) == 0:
         return []
     rects[:,2:] += rects[:,:2]
@@ -62,7 +74,7 @@ def smooth_face(rects):
     # choose which face rect to process
     # currently the first one is choosen, even if incorrect
     if len(rects) > 0:
-        # store first rect in history list
+        # store first rect in history array
         smooth_face_history[smooth_face_counter] = rects[0:1]
         smooth_face_counter += 1
         
@@ -82,10 +94,13 @@ def smooth_face(rects):
 
 if __name__ == '__main__':
     
-    cascade = cv2.CascadeClassifier(cascade_fn)
-    nested = cv2.CascadeClassifier(nested_fn)
+    # create cascades for face and eyes
+    face_cascade = cv2.CascadeClassifier(face_cascade_fn)
+    eye_cascade = cv2.CascadeClassifier(eye_cascade_fn)
     
+    # create video capture
     cam = cv2.VideoCapture(-1)
+    
     
     frame_read_time, face_detect_time, frames_per_second = 0, 0, 0
     display_frt, display_fdt, display_fps = 0, 0, 0
@@ -97,33 +112,44 @@ if __name__ == '__main__':
     while True:
         t1 = time.time()
         
+        # read image from camera
         ret, img = cam.read()
+        
+        # create grayscale image for faster processing
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         gray = cv2.equalizeHist(gray)
         
         t2 = time.time()
         
-        rects = detect_face(gray, cascade)
-        vis = img.copy()
+        # detect faces in image
+        face_rects = detect_face(gray, face_cascade)
+        
+        disp_img = img.copy()
+        
+        # show each detected face in real time
         if SHOW_REAL_TIME:
-            draw_rects(vis, rects, (0, 255, 0))
+            draw_rects(disp_img, face_rects, (0, 255, 0))
         
-        if len(rects) > 1:
-            rect = rects[0:1]
-            print "---"
-            for item in rect:
-                print item
+        # if len(rects) > 1:
+            # rect = rects[0:1]
+            # print "---"
+            # for item in rect:
+                # print item
         
-        for x1, y1, x2, y2 in rects:
-            roi = gray[y1:y2, x1:x2]
-            vis_roi = vis[y1:y2, x1:x2]
-            subrects = detect_eyes(roi.copy(), nested)
-            draw_rects(vis_roi, subrects, (255, 0, 0))
+        # update smooth_face rectangle
+        smoothed_face = smooth_face(face_rects)
+        
+        for x1, y1, x2, y2 in smoothed_face:
+        # for x1, y1, x2, y2 in rects:
+            face_area = gray[y1:y2, x1:x2]
+            disp_img_face_area = disp_img[y1:y2, x1:x2]
+            eye_rects = detect_eyes(face_area.copy(), eye_cascade)
+            draw_rects(disp_img_face_area, eye_rects, (255, 0, 0))
         
         t3 = time.time()
         
         if SHOW_SMOOTH:
-            if len(rects) > 0:
+            if len(face_rects) > 0:
                 color += 16
                 if color > 255:
                     color = 255
@@ -132,7 +158,7 @@ if __name__ == '__main__':
                 if color < 0:
                     color = 0
                     
-            draw_rects(vis, smooth_face(rects), (0, color, (255-color)))
+            draw_rects(disp_img, smooth_face(face_rects), (0, color, (255-color)))
         
         t4 = time.time()
         
@@ -158,15 +184,15 @@ if __name__ == '__main__':
             frame_read_time, face_detect_time, frames_per_second = 0, 0, 0
         
         # Draw stats
-        draw_text(vis, 'frame read time: %.1f ms' % (1000+display_frt), (20, 20))
-        draw_text(vis, 'face detect time: %.1f ms' % (1000+display_fdt), (20, 40))
-        draw_text(vis, 'fps: %.1f' % (1000+display_fps), (20, 60))
-        draw_text(vis, 'time: %.3f' % (1000+time.time()), (20, 80))
-        draw_text(vis, 'Total time: %.1f ms' % (1000+(1000*(t4-t1))), (20, 100))
+        draw_text(disp_img, 'frame read time: %.1f ms' % (1000+display_frt), (20, 20))
+        draw_text(disp_img, 'face detect time: %.1f ms' % (1000+display_fdt), (20, 40))
+        draw_text(disp_img, 'fps: %.1f' % (1000+display_fps), (20, 60))
+        draw_text(disp_img, 'time: %.3f' % (1000+time.time()), (20, 80))
+        draw_text(disp_img, 'Total time: %.1f ms' % (1000+(1000*(t4-t1))), (20, 100))
         
         # Show images
         cv2.imshow('Grayscale', gray)
-        cv2.imshow('Face Detector', vis)
+        cv2.imshow('Face Detector', disp_img)
         
         # Exit on ESC
         if cv2.waitKey(5) == 27:
