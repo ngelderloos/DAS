@@ -21,30 +21,27 @@ SHOW = True
 NUMBER_OF_TESTS = 1000
 
 #-------------------------------------------------------------------------
-# detect_face() uses the given cascade to find the desired features.
+# detect_faces() uses the given cascade to find the desired features.
 # Receive: img, an image
 #          cascade, the cascade to use to locate the features
 # Return: rects, a list of rectangles, each represented as numpy.ndarray
 #-------------------------------------------------------------------------
-def detect_face(img, cascade):
-    
-    # detectMultiScale(image, rejectLevels, levelWeights[, scaleFactor[, minNeighbors[, flags[, minSize[, maxSize[, outputRejectLevels]]]]]]
+def detect_faces(img, cascade):
+    #---------------------------------------------------------------------
+    # detectMultiScale(image[, scaleFactor[, minNeighbors[, flags[, minSize[, maxSize]]]]])
     # image - Matrix of the type CV_8U containing an image where objects are detected.
-    # rejectLevels - 
-    # levelWeights - 
     # scaleFactor - Parameter specifying how mucht the image size is reduced at each image object.
     # minNeighbors - Parameter specifying how many neighbors each candidate rectangle should have to retain it.
     # flags - Parameter with the same meaning for an old cascade as in the function cvHaarDetectObjects. It is not used for a new cascade.
     # minSize - Minimum possible object size. Objects smaller than that are ignored.
     # maxSize - Maximum possible object size. Objects larger than that are ignored.
-    # outputRejectLevels - 
+    #---------------------------------------------------------------------
     rects = cascade.detectMultiScale(img, scaleFactor=1.3, minNeighbors=4, minSize=(100, 100), flags = cv.CV_HAAR_SCALE_IMAGE)
     
     if len(rects) == 0:
         return []
-    print rects, "asdf"
-    rects[:,2:] += rects[:,:2] # adds the first set of values to the second set
-    print rects, "jkl;"
+    # transforms [x1, y1, width, length] into [x1, y1, x2, y2]
+    rects[:,2:] += rects[:,:2]
     return rects
 
 def detect_eyes(img, cascade):
@@ -54,6 +51,19 @@ def detect_eyes(img, cascade):
     rects[:,2:] += rects[:,:2]
     return rects
 
+#---------------------------------------------------------------------------------------------------
+# choose_face() selects the desired face from possible faces. The desired face is determined based
+# off proximity to the previous face. If no faces are passed, the method will return the same empty 
+# list. If one face is passed, the proximity will be checked. If it is not within the acceptable
+# range, the proximity counter will be increased, in hopes of finding the face next time in a larger
+# range. If there are multiple faces, the method will look for the closest face to the previously
+# selected face. It will then check if it is within the acceptable proximity and, if so, return it.
+# If not, the proximity counter will be increased.
+#---------------------------------------------------------------------------------------------------
+def choose_face(face_rects):
+    #TODO: put code here
+    return face_rects
+    
 #-------------------------------------------------------------------------
 # draw_rects() draws a rectangle on the given image using the coordinates
 # provided and line width of two pixels.
@@ -144,7 +154,7 @@ if __name__ == '__main__':
         t2 = time.time()
         
         # detect faces in image
-        face_rects = detect_face(gray, face_cascade)
+        face_rects = detect_faces(gray, face_cascade)
         faces_found = len(face_rects)
         
         if SHOW:
