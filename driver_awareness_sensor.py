@@ -59,10 +59,44 @@ def detect_eyes(img, cascade):
 # range. If there are multiple faces, the method will look for the closest face to the previously
 # selected face. It will then check if it is within the acceptable proximity and, if so, return it.
 # If not, the proximity counter will be increased.
+# Receive: face_rects, a list of numpy arrays containing x1, y1, x2, y2
+# Return: selected_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
 def choose_face(face_rects):
     #TODO: put code here
     return face_rects
+    
+#---------------------------------------------------------------------------------------------------
+# smooth_face() smooths the face rectangle by averaging a set number of previous face rectangles.
+# Receive: face_rect, a numpy array containing x1, y1, x2, y2
+# Return: smoothed_face, a numpy array containing x1, y1, x2, y2
+#---------------------------------------------------------------------------------------------------
+def smooth_face(face_rect):
+    #TODO: update method to receive and return correct types
+    
+    global smooth_face_counter, smooth_face_history
+    
+    # choose which face rect to process
+    # currently the first one is choosen, even if incorrect
+    if len(face_rect) > 0:
+        # store first rect in history array
+        smooth_face_history[smooth_face_counter] = face_rect[0:1]
+        smooth_face_counter += 1
+        smooth_face_counter %= SMOOTH_FACE_MAX
+        
+        # reset counter, if necessary
+        if smooth_face_counter >= SMOOTH_FACE_MAX:
+            smooth_face_counter = 0
+    
+    x1sum = y1sum = x2sum = y2sum = 0
+    
+    for x1, y1, x2, y2 in smooth_face_history:
+        x1sum += x1
+        y1sum += y1
+        x2sum += x2
+        y2sum += y2
+    
+    return [np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])]
     
 #---------------------------------------------------------------------------------------------------
 # draw_rects() draws a rectangle on the given image using the coordinates provided and line width of
@@ -85,31 +119,7 @@ def draw_text(img, text, (x, y)):
     cv2.putText(img, text, (x+1, y+1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0, 0, 0), 2, cv2.CV_AA)
     cv2.putText(img, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), 1, cv2.CV_AA)
     
-def smooth_face(rects):
-    global smooth_face_counter, smooth_face_history
-    
-    # choose which face rect to process
-    # currently the first one is choosen, even if incorrect
-    if len(rects) > 0:
-        # store first rect in history array
-        smooth_face_history[smooth_face_counter] = rects[0:1]
-        smooth_face_counter += 1
-        smooth_face_counter %= SMOOTH_FACE_MAX
-        
-        # reset counter, if necessary
-        if smooth_face_counter >= SMOOTH_FACE_MAX:
-            smooth_face_counter = 0
-    
-    x1sum = y1sum = x2sum = y2sum = 0
-    
-    for x1, y1, x2, y2 in smooth_face_history:
-        x1sum += x1
-        y1sum += y1
-        x2sum += x2
-        y2sum += y2
-    
-    return [np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])]
-
+####################################################################################################
 if __name__ == '__main__':
     
     if not SHOW:
