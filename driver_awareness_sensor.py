@@ -107,10 +107,20 @@ def smooth_face(face_rect):
 # keep the eyes separate from each other. This is important for the detect_eye_state() function so
 # it can compare the same eye each time.
 # Receive: eye_rects, a list of numpy arrays containing x1, y1, x2, y2 for each eye detected
-# Return: smoothed_eyes, a list of numpy arrays containing x1, y1, x2, y2 for the left and right
-#            eyes
+# Return: selected_eyes, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
 #---------------------------------------------------------------------------------------------------
 def choose_eyes(eye_rects):
+    #TODO: implement method
+    selected_eyes = []
+    return selected_eyes
+
+#---------------------------------------------------------------------------------------------------
+# smooth_eyes() smooths the eye rectangles by averaging a set number of previous eye rectangles, for
+# both eyes.
+# Receive: eye_rects, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
+# Return: smoothed_eyes, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
+#---------------------------------------------------------------------------------------------------
+def smooth_eyes(eye_rects)
     #TODO: implement method
     smoothed_eyes = []
     return smoothed_eyes
