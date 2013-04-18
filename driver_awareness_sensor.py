@@ -20,14 +20,14 @@ SHOW = True
 
 NUMBER_OF_TESTS = 1000
 
-#-------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------
 # detect_faces() uses the given cascade to find the desired features.
 # Receive: img, an image
 #          cascade, the cascade to use to locate the features
 # Return: rects, a list of rectangles, each represented as numpy.ndarray
-#-------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------
 def detect_faces(img, cascade):
-    #---------------------------------------------------------------------
+    #-----------------------------------------------------------------------------------------------
     # detectMultiScale(image[, scaleFactor[, minNeighbors[, flags[, minSize[, maxSize]]]]])
     # image - Matrix of the type CV_8U containing an image where objects are detected.
     # scaleFactor - Parameter specifying how mucht the image size is reduced at each image object.
@@ -35,7 +35,7 @@ def detect_faces(img, cascade):
     # flags - Parameter with the same meaning for an old cascade as in the function cvHaarDetectObjects. It is not used for a new cascade.
     # minSize - Minimum possible object size. Objects smaller than that are ignored.
     # maxSize - Maximum possible object size. Objects larger than that are ignored.
-    #---------------------------------------------------------------------
+    #-----------------------------------------------------------------------------------------------
     rects = cascade.detectMultiScale(img, scaleFactor=1.3, minNeighbors=4, minSize=(100, 100), flags = cv.CV_HAAR_SCALE_IMAGE)
     
     if len(rects) == 0:
@@ -64,24 +64,23 @@ def choose_face(face_rects):
     #TODO: put code here
     return face_rects
     
-#-------------------------------------------------------------------------
-# draw_rects() draws a rectangle on the given image using the coordinates
-# provided and line width of two pixels.
+#---------------------------------------------------------------------------------------------------
+# draw_rects() draws a rectangle on the given image using the coordinates provided and line width of
+# two pixels.
 # Receive: img, an image
 #          rects, a list of rectangles, each represented as numpy.ndarray
 #          color, the color of the rectangle
-#-------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------
 def draw_rects(img, rects, color):
     for x1, y1, x2, y2 in rects:
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
 
-#-------------------------------------------------------------------------
-# draw_text() draws the given text on the image at the specified
-# coordinates.
+#---------------------------------------------------------------------------------------------------
+# draw_text() draws the given text on the image at the specified coordinates.
 # Receive: img, an image
 #          text, the text to draw on the image
 #          (x, y), the coordinates of the lower left corner
-#-------------------------------------------------------------------------
+#---------------------------------------------------------------------------------------------------
 def draw_text(img, text, (x, y)):
     cv2.putText(img, text, (x+1, y+1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0, 0, 0), 2, cv2.CV_AA)
     cv2.putText(img, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), 1, cv2.CV_AA)
