@@ -125,6 +125,16 @@ def smooth_eyes(eye_rects)
     smoothed_eyes = []
     return smoothed_eyes
     
+#---------------------------------------------------------------------------------------------------
+# detect_eye_state() determines the state of each eye, whether open or closed (or in between?).
+# Receive: eye_rects, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
+# Return: eye_state, a yet to be determined value of a yet to be determined type
+#---------------------------------------------------------------------------------------------------
+def detect_eye_state(eye_rects)
+    #TODO: implement method
+    
+####################################################################################################
+# Drawing functions for demo and debug.
 ####################################################################################################
 
 #---------------------------------------------------------------------------------------------------
@@ -148,6 +158,8 @@ def draw_text(img, text, (x, y)):
     cv2.putText(img, text, (x+1, y+1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0, 0, 0), 2, cv2.CV_AA)
     cv2.putText(img, text, (x, y), cv2.FONT_HERSHEY_PLAIN, 1.0, (255, 255, 255), 1, cv2.CV_AA)
     
+####################################################################################################
+# The main code, where it all goes down...
 ####################################################################################################
 if __name__ == '__main__':
     
