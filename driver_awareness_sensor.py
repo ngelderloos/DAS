@@ -59,12 +59,13 @@ def detect_eyes(img, cascade):
 # range. If there are multiple faces, the method will look for the closest face to the previously
 # selected face. It will then check if it is within the acceptable proximity and, if so, return it.
 # If not, the proximity counter will be increased.
-# Receive: face_rects, a list of numpy arrays containing x1, y1, x2, y2
+# Receive: face_rects, a list of numpy arrays containing x1, y1, x2, y2 for each face detected
 # Return: selected_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
 def choose_face(face_rects):
-    #TODO: put code here
-    return face_rects
+    #TODO: implement method
+    selected_face = np.zeros(4, dtype=np.int32)
+    return selected_face
     
 #---------------------------------------------------------------------------------------------------
 # smooth_face() smooths the face rectangle by averaging a set number of previous face rectangles.
@@ -96,8 +97,26 @@ def smooth_face(face_rect):
         x2sum += x2
         y2sum += y2
     
-    return [np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])]
+    smoothed_face = [np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])]
     
+    return smoothed_face
+    
+#---------------------------------------------------------------------------------------------------
+# choose_eyes() attempts to select the desired eyes from the possible detected eyes. The method will
+# use the proximity of previously located eyes and the relative location within the face in order to
+# keep the eyes separate from each other. This is important for the detect_eye_state() function so
+# it can compare the same eye each time.
+# Receive: eye_rects, a list of numpy arrays containing x1, y1, x2, y2 for each eye detected
+# Return: smoothed_eyes, a list of numpy arrays containing x1, y1, x2, y2 for the left and right
+#            eyes
+#---------------------------------------------------------------------------------------------------
+def choose_eyes(eye_rects):
+    #TODO: implement method
+    smoothed_eyes = []
+    return smoothed_eyes
+    
+####################################################################################################
+
 #---------------------------------------------------------------------------------------------------
 # draw_rects() draws a rectangle on the given image using the coordinates provided and line width of
 # two pixels.
