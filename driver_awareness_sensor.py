@@ -9,11 +9,15 @@ eye_cascade_fn = "./data/haarcascades/haarcascade_eye.xml"
 
 SMOOTH_FACE_MAX = 10
 smooth_face_history = np.zeros((SMOOTH_FACE_MAX, 4), dtype=np.int32)
+smooth_face_history[0] = [0, 0, 10, 10] # avoids initial size of zero for smooth_face() if no face is found
 smooth_face_counter = 0
 
+CAPTURE_WIDTH = 640
+CAPTURE_HEIGHT = CAPTURE_WIDTH * 3 / 4
+
 SHOW_REAL_TIME = False
-SHOW_SMOOTH = False
-SHOW_EYES = False
+SHOW_SMOOTH = True
+SHOW_EYES = True
 SHOW_STATS = False
 
 SHOW = True
@@ -40,8 +44,8 @@ def detect_faces(img, cascade):
     
     if len(rects) == 0:
         return []
-    # transforms [x1, y1, width, length] into [x1, y1, x2, y2]
-    rects[:,2:] += rects[:,:2]
+    
+    rects[:,2:] += rects[:,:2] # transforms [x1, y1, width, length] into [x1, y1, x2, y2]
     return rects
 
 def detect_eyes(img, cascade):
@@ -109,6 +113,8 @@ def smooth_face(face_rect):
 # Receive: eye_rects, a list of numpy arrays containing x1, y1, x2, y2 for each eye detected
 # Return: selected_eyes, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
 #---------------------------------------------------------------------------------------------------
+previous_eye_rect = np.zeros(4)
+
 def choose_eyes(eye_rects):
     #TODO: implement method
     selected_eyes = []
@@ -120,7 +126,7 @@ def choose_eyes(eye_rects):
 # Receive: eye_rects, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
 # Return: smoothed_eyes, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
 #---------------------------------------------------------------------------------------------------
-def smooth_eyes(eye_rects)
+def smooth_eyes(eye_rects):
     #TODO: implement method
     smoothed_eyes = []
     return smoothed_eyes
@@ -130,8 +136,10 @@ def smooth_eyes(eye_rects)
 # Receive: eye_rects, a list of numpy arrays containing x1, y1, x2, y2 for both eyes
 # Return: eye_state, a yet to be determined value of a yet to be determined type
 #---------------------------------------------------------------------------------------------------
-def detect_eye_state(eye_rects)
+def detect_eye_state(eye_rects):
     #TODO: implement method
+    eye_state = []
+    return eye_state
     
 ####################################################################################################
 # Drawing functions for demo and debug.
@@ -178,6 +186,8 @@ if __name__ == '__main__':
     
     # set capture settings
     #TODO!
+    cam.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH)
+    cam.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
     
     frame_read_time, face_detect_time, frames_per_second = 0, 0, 0
     display_frt, display_fdt, display_fps = 0, 0, 0
@@ -213,12 +223,6 @@ if __name__ == '__main__':
         # show each detected face in real time
         if SHOW_REAL_TIME:
             draw_rects(disp_img, face_rects, (0, 255, 0))
-        
-        # if len(rects) > 1:
-            # rect = rects[0:1]
-            # print "---"
-            # for item in rect:
-                # print item
         
         # update smooth_face rectangle
         smoothed_face = smooth_face(face_rects)
@@ -283,6 +287,8 @@ if __name__ == '__main__':
         
         # Show images
         if SHOW:
+            gray = cv2.flip(gray, 1)
+            disp_img = cv2.flip(disp_img, 1)
             cv2.imshow('Grayscale', gray)
             cv2.imshow('Face Detector', disp_img)
             
