@@ -12,18 +12,45 @@ smooth_face_history = np.zeros((SMOOTH_FACE_MAX, 4), dtype=np.int32)
 smooth_face_history[0] = [0, 0, 10, 10] # avoids initial size of zero for smooth_face() if no face is found
 smooth_face_counter = 0
 
-CAPTURE_WIDTH = 640
+CAPTURE_WIDTH = 160 # default is 640 (160, 176, 320, 352, 640)
 CAPTURE_HEIGHT = CAPTURE_WIDTH * 3 / 4
 
-SHOW_REAL_TIME = False
+SHOW_REAL_TIME = True
 SHOW_SMOOTH = True
 SHOW_EYES = True
 SHOW_STATS = False
 
 SHOW = True
 
+TIMEIT = True	
+
 NUMBER_OF_TESTS = 1000
 
+#---------------------------------------------------------------------------------------------------
+# read_frame() returns the next frame from the camera.
+# Receive: camera, the camera to use for capture
+# Return: frame, the next frame from camera
+#---------------------------------------------------------------------------------------------------
+def read_frame(camera):
+    frame_found, frame = cam.read()
+    while not frame_found:
+        frame_found, frame = cam.read()
+    return frame
+
+#---------------------------------------------------------------------------------------------------
+# preprocess() processes the image to make it smaller to increase future processing time.
+# Receive: image, the image to be processed
+# Return: processed_image, the imaged that has been processed
+#---------------------------------------------------------------------------------------------------
+def preprocess(image):
+    # reduce the number of channels
+    processed_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    
+    # compensate for lighting variations
+    processed_image = cv2.equalizeHist(processed_image)
+    
+    return processed_image
+    
 #---------------------------------------------------------------------------------------------------
 # detect_faces() uses the given cascade to find the desired features.
 # Receive: img, an image
@@ -40,7 +67,8 @@ def detect_faces(img, cascade):
     # minSize - Minimum possible object size. Objects smaller than that are ignored.
     # maxSize - Maximum possible object size. Objects larger than that are ignored.
     #-----------------------------------------------------------------------------------------------
-    rects = cascade.detectMultiScale(img, scaleFactor=1.3, minNeighbors=4, minSize=(100, 100), flags = cv.CV_HAAR_SCALE_IMAGE)
+    height = len(img)
+    rects = cascade.detectMultiScale(img, scaleFactor=1.3, minNeighbors=1, minSize=(height/3, height/3), flags = cv.CV_HAAR_SCALE_IMAGE)
     
     if len(rects) == 0:
         return []
@@ -49,7 +77,9 @@ def detect_faces(img, cascade):
     return rects
 
 def detect_eyes(img, cascade):
-    rects = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=4, minSize=(50, 50), flags=cv.CV_HAAR_SCALE_IMAGE)
+    # height = len(img)
+    min_eye_size = len(img)/5
+    rects = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=4, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
     if len(rects) == 0:
         return []
     rects[:,2:] += rects[:,:2]
@@ -68,7 +98,11 @@ def detect_eyes(img, cascade):
 #---------------------------------------------------------------------------------------------------
 def choose_face(face_rects):
     #TODO: implement method
-    selected_face = np.zeros(4, dtype=np.int32)
+    # selected_face = np.zeros(4, dtype=np.int32)
+    if len(face_rects) == 0:
+        return None
+    selected_face = face_rects[0]
+    
     return selected_face
     
 #---------------------------------------------------------------------------------------------------
@@ -201,21 +235,61 @@ if __name__ == '__main__':
     average = 0.0
     i = 0
     while True:
-    # for i in range(NUMBER_OF_TESTS):
-        t1 = time.time()
+        ##### read image from camera
+        if TIMEIT:
+            t1 = time.time()
         
-        # read image from camera
-        ret, img = cam.read()
+        frame = read_frame(cam)
+        img = frame #REMOVE
         
-        # create grayscale image for faster processing
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.equalizeHist(gray)
+        ##### convert to grayscale and equalize
+        if TIMEIT:
+            t2 = time.time()
+            
+        gray = preprocess(frame)
         
-        t2 = time.time()
+        ##### detect faces in image
+        if TIMEIT:
+            t3 = time.time()
         
-        # detect faces in image
+        # print len(gray), len(gray[0])
         face_rects = detect_faces(gray, face_cascade)
-        faces_found = len(face_rects)
+        faces_found = len(face_rects) # number of faces found
+        
+        ##### choose correct face from detected faces
+        if TIMEIT:
+            t4 = time.time()
+        
+        face_rect = choose_face(face_rects)
+        # print face_rect
+        
+        ##### smooth face using recent average
+        
+        ##### detect eyes in smoothed face
+        
+        ##### choose correct eyes from detected eyes
+        
+        ##### smooth eyes using recent average
+        
+        ##### detect the state of the eyes
+        
+        ##### output alert if state of eyes is dangerous
+    
+        ########## Begin old code ##########
+        # t1 = time.time()
+        
+        # # read image from camera
+        # ret, img = cam.read()
+        
+        # # create grayscale image for faster processing
+        # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # gray = cv2.equalizeHist(gray)
+        
+        # t2 = time.time()
+        
+        # # detect faces in image
+        # face_rects = detect_faces(gray, face_cascade)
+        # faces_found = len(face_rects)
         
         if SHOW:
             disp_img = img.copy()
@@ -274,7 +348,7 @@ if __name__ == '__main__':
             display_frt = 1000*(frame_read_time / counter)
             display_fdt = 1000*(face_detect_time / counter)
             display_fps = 1/(frames_per_second / counter)
-            counter = 0
+            #counter = 0
             frame_read_time, face_detect_time, frames_per_second = 0, 0, 0
         
         # Draw stats
