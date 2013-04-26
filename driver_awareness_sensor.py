@@ -3,28 +3,62 @@ import cv2
 import cv2.cv as cv
 import time
 import numpy as np
+import sys
 
-face_cascade_fn = "./data/haarcascades/haarcascade_frontalface_alt.xml"
-eye_cascade_fn = "./data/haarcascades/haarcascade_eye.xml"
+####################################################################################################
+# CONFIGURATION
+#################################################################################################### 
 
-SMOOTH_FACE_MAX = 10
+# location of face cascade file
+FACE_CASCADE_FN = "./data/haarcascades/haarcascade_frontalface_default.xml"
+
+# location of eye cascade file
+EYE_CASCADE_FN = "./data/haarcascades/haarcascade_eye.xml"
+
+# camera capture width
+# default is 640
+# possible values seem to be 160, 176, 320, 352, 640
+CAPTURE_WIDTH = 320
+
+NUMBER_OF_TESTS = None   # sets the number of frames to grab and process, set to None to disable
+
+### visual output settings
+
+# if SHOW is false, all SHOW_ settings are false
+# if SHOW is true, SHOW_ settings keep their assigned values
+SHOW = True
+
+SHOW_DEBUG = False           # shows print statements in the console
+
+SHOW_GRAYSCALE = True       # shows the grayscale image used by the detectMultiScale function
+SHOW_RT_FACE = True         # shows all detected faces for each frame
+SHOW_SMOOTH_FACE = True     # shows the smoothed_face rect
+SHOW_RT_EYES = True         # shows all detected eyes for each frame
+SHOW_SMOOTH_EYES = False    # shows the smoothed_eyes rects
+SHOW_STATS = True           # shows the stats overlaid on the image
+
+TIMEIT = True               # records time after each part, may slow down process
+
+####################################################################################################
+# End Configuration
+####################################################################################################
+
+SMOOTH_FACE_MAX = 10 # number of frames to take face rect average
 smooth_face_history = np.zeros((SMOOTH_FACE_MAX, 4), dtype=np.int32)
 smooth_face_history[0] = [0, 0, 10, 10] # avoids initial size of zero for smooth_face() if no face is found
 smooth_face_counter = 0
 
-CAPTURE_WIDTH = 160 # default is 640 (160, 176, 320, 352, 640)
 CAPTURE_HEIGHT = CAPTURE_WIDTH * 3 / 4
 
-SHOW_REAL_TIME = True
-SHOW_SMOOTH = True
-SHOW_EYES = True
-SHOW_STATS = False
+X1, Y1, X2, Y2 = 0, 1, 2, 3
 
-SHOW = True
-
-TIMEIT = True	
-
-NUMBER_OF_TESTS = 1000
+if not SHOW:
+    SHOW_GRAYSCALE = False
+    SHOW_RT_FACE = False
+    SHOW_SMOOTH_FACE = False
+    SHOW_RT_EYES = False
+    SHOW_SMOOTH_EYES = False
+    SHOW_STATS = False
 
 #---------------------------------------------------------------------------------------------------
 # read_frame() returns the next frame from the camera.
@@ -79,7 +113,8 @@ def detect_faces(img, cascade):
 def detect_eyes(img, cascade):
     # height = len(img)
     min_eye_size = len(img)/5
-    rects = cascade.detectMultiScale(img, scaleFactor=1.1, minNeighbors=4, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
+    #TODO? max_eye_size = len(img)/2
+    rects = cascade.detectMultiScale(img, scaleFactor=2, minNeighbors=5, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
     if len(rects) == 0:
         return []
     rects[:,2:] += rects[:,:2]
@@ -111,22 +146,15 @@ def choose_face(face_rects):
 # Return: smoothed_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
 def smooth_face(face_rect):
-    #TODO: update method to receive and return correct types
+    #TODO: update method to return correct types
     
     global smooth_face_counter, smooth_face_history
     
-    # choose which face rect to process
-    # currently the first one is choosen, even if incorrect
-    if len(face_rect) > 0:
-        # store first rect in history array
-        smooth_face_history[smooth_face_counter] = face_rect[0:1]
-        smooth_face_counter += 1
-        smooth_face_counter %= SMOOTH_FACE_MAX
+    # if face_rect contains a face, add it to the history, replacing the oldest
+    if not face_rect == None:
+        smooth_face_history[smooth_face_counter] = face_rect
+        smooth_face_counter = (smooth_face_counter + 1) % SMOOTH_FACE_MAX
         
-        # reset counter, if necessary
-        if smooth_face_counter >= SMOOTH_FACE_MAX:
-            smooth_face_counter = 0
-    
     x1sum = y1sum = x2sum = y2sum = 0
     
     for x1, y1, x2, y2 in smooth_face_history:
@@ -135,7 +163,7 @@ def smooth_face(face_rect):
         x2sum += x2
         y2sum += y2
     
-    smoothed_face = [np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])]
+    smoothed_face = np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])
     
     return smoothed_face
     
@@ -190,6 +218,9 @@ def draw_rects(img, rects, color):
     for x1, y1, x2, y2 in rects:
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
 
+def draw_rect(img, rect, color):
+    cv2.rectangle(img, (rect[0], rect[1]), (rect[2], rect[3]), color, 2)
+    
 #---------------------------------------------------------------------------------------------------
 # draw_text() draws the given text on the image at the specified coordinates.
 # Receive: img, an image
@@ -205,35 +236,35 @@ def draw_text(img, text, (x, y)):
 ####################################################################################################
 if __name__ == '__main__':
     
-    if not SHOW:
-        SHOW_REAL_TIME = False
-        SHOW_SMOOTH = False
-        SHOW_EYES = False
-        SHOW_STATS = False
-    
+    print "Starting Driver Awareness Sensor..."
+    print "Running (ESC in window to exit)..."
+        
     # create cascades for face and eyes
-    face_cascade = cv2.CascadeClassifier(face_cascade_fn)
-    eye_cascade = cv2.CascadeClassifier(eye_cascade_fn)
+    face_cascade = cv2.CascadeClassifier(FACE_CASCADE_FN)
+    eye_cascade = cv2.CascadeClassifier(EYE_CASCADE_FN)
     
     # create video capture
     cam = cv2.VideoCapture(-1)
     
     # set capture settings
-    #TODO!
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH)
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
     
+    runtime_sum = 0.0000001 # prevent divide by zero
+    counter = 1
+    
     frame_read_time, face_detect_time, frames_per_second = 0, 0, 0
     display_frt, display_fdt, display_fps = 0, 0, 0
-    counter = 0
+    # counter = 0
     previous_display_time = 0
     
     color = 0
     
-    #s print "SHOW: " + str(SHOW) + " - " + str(SHOW_REAL_TIME) + " - " + str(SHOW_SMOOTH)
+    
     
     average = 0.0
     i = 0
+    
     while True:
         ##### read image from camera
         if TIMEIT:
@@ -242,11 +273,13 @@ if __name__ == '__main__':
         frame = read_frame(cam)
         img = frame #REMOVE
         
+        
         ##### convert to grayscale and equalize
         if TIMEIT:
             t2 = time.time()
             
         gray = preprocess(frame)
+        
         
         ##### detect faces in image
         if TIMEIT:
@@ -256,126 +289,122 @@ if __name__ == '__main__':
         face_rects = detect_faces(gray, face_cascade)
         faces_found = len(face_rects) # number of faces found
         
+        
         ##### choose correct face from detected faces
         if TIMEIT:
             t4 = time.time()
         
         face_rect = choose_face(face_rects)
-        # print face_rect
+        if SHOW_DEBUG:
+            print "face_rect: ", face_rect
+        
         
         ##### smooth face using recent average
+        if TIMEIT:
+            t5 = time.time()
+        
+        smoothed_face = smooth_face(face_rect)
+        if SHOW_DEBUG:
+            print "smoothed_face: ", smoothed_face
+        
         
         ##### detect eyes in smoothed face
+        if TIMEIT:
+            t6 = time.time()
+        
+        face_area = gray[smoothed_face[Y1]:smoothed_face[Y2], smoothed_face[X1]:smoothed_face[X2]]
+        eye_rects = detect_eyes(face_area.copy(), eye_cascade)
+        eyes_found = len(eye_rects)
+        
         
         ##### choose correct eyes from detected eyes
+        if TIMEIT:
+            t7 = time.time()
+        
         
         ##### smooth eyes using recent average
+        if TIMEIT: 
+            t8 = time.time()
+        
         
         ##### detect the state of the eyes
+        if TIMEIT:
+            t9 = time.time()
+        
         
         ##### output alert if state of eyes is dangerous
-    
-        ########## Begin old code ##########
-        # t1 = time.time()
+        if TIMEIT:
+            t10 = time.time()
         
-        # # read image from camera
-        # ret, img = cam.read()
         
-        # # create grayscale image for faster processing
-        # gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # gray = cv2.equalizeHist(gray)
-        
-        # t2 = time.time()
-        
-        # # detect faces in image
-        # face_rects = detect_faces(gray, face_cascade)
-        # faces_found = len(face_rects)
+        ##### Display stuff for debug/demo
+        if TIMEIT:
+            t11 = time.time()
         
         if SHOW:
-            disp_img = img.copy()
-        
-        # show each detected face in real time
-        if SHOW_REAL_TIME:
-            draw_rects(disp_img, face_rects, (0, 255, 0))
-        
-        # update smooth_face rectangle
-        smoothed_face = smooth_face(face_rects)
-        
-        eyes_found = 0
-        for x1, y1, x2, y2 in smoothed_face:
-        # for x1, y1, x2, y2 in rects:
-            face_area = gray[y1:y2, x1:x2]
-            eye_rects = detect_eyes(face_area.copy(), eye_cascade)
-            eyes_found += len(eye_rects)
+            display_image = img.copy()
             
-            if SHOW_EYES:
-                disp_img_face_area = disp_img[y1:y2, x1:x2]
-                draw_rects(disp_img_face_area, eye_rects, (255, 0, 0))
-        
-        t3 = time.time()
-        
-        if SHOW_SMOOTH:
-            if len(face_rects) > 0:
-                color += 16
-                if color > 255:
-                    color = 255
-            else:
-                color -= 16
-                if color < 0:
-                    color = 0
-                    
-            draw_rects(disp_img, smooth_face(face_rects), (0, color, (255-color)))
-        
-        t4 = time.time()
-        
-        average += t4-t1
-        
-        #----------------------------------------
-        # General image processing done. The 
-        # following is for demonstration and
-        # debug.
-        #----------------------------------------
-        
-        counter = counter + 1
-        frame_read_time += t2 - t1
-        face_detect_time += t3 - t2
-        frames_per_second += t3 - t1
-        
-        # Update stats every second, currently does not seem to work as desired
-        current_seconds = int(time.time())
-        if current_seconds != previous_display_time: # display average each second
-            previous_time_display = current_seconds
-            display_frt = 1000*(frame_read_time / counter)
-            display_fdt = 1000*(face_detect_time / counter)
-            display_fps = 1/(frames_per_second / counter)
-            #counter = 0
-            frame_read_time, face_detect_time, frames_per_second = 0, 0, 0
-        
-        # Draw stats
-        if SHOW_STATS:
-            draw_text(disp_img, 'frame read time: %.1f ms' % (1000+display_frt), (20, 20))
-            draw_text(disp_img, 'face detect time: %.1f ms' % (1000+display_fdt), (20, 40))
-            draw_text(disp_img, 'fps: %.1f' % (1000+display_fps), (20, 60))
-            draw_text(disp_img, 'time: %.3f' % (1000+time.time()), (20, 80))
-            draw_text(disp_img, 'Total time: %.1f ms' % (1000+(1000*(t4-t1))), (20, 100))
-        
-        # Show images
-        if SHOW:
-            gray = cv2.flip(gray, 1)
-            disp_img = cv2.flip(disp_img, 1)
-            cv2.imshow('Grayscale', gray)
-            cv2.imshow('Face Detector', disp_img)
+            # Draw all faces
+            if SHOW_RT_FACE:
+                draw_rects(display_image, face_rects, (0, 255, 0))
+            
+            # Draw smoothed face
+            if SHOW_SMOOTH_FACE:
+                if not face_rect == None:
+                    color = color + 16 if color <= 239 else 255
+                else:
+                    color = color - 16 if color >= 15 else 0
+                
+                draw_rect(display_image, smoothed_face, (0, color, (255 - color)))
+            
+            # Draw all eyes
+            if SHOW_RT_EYES:
+                display_image_face_area = display_image[smoothed_face[0]:smoothed_face[1], smoothed_face[2]:smoothed_face[3]]
+                draw_rects(display_image_face_area, eye_rects, (255, 0, 0))
+            
+            display_image = cv2.flip(display_image, 1)
+            
+            # Print stats on image
+            if SHOW_STATS and TIMEIT:
+                draw_text(display_image, 'Average time: %.1f ms' % (runtime_sum/counter*1000), (20, 20))
+                draw_text(display_image, 'Average fps: %.1f' % (1/(runtime_sum/counter)), (20, 40))
+                            
+            cv2.imshow('Face Detector', display_image)
+            
+            if SHOW_GRAYSCALE:
+                gray = cv2.flip(gray, 1)
+                cv2.imshow('Grayscale', gray)
             
         # Display stats on console
-        print str(i) + " - Faces: " + str(faces_found) + " -- Eyes: " + str(eyes_found)
+        runtime_sum += t11 - t1
+        
+        if SHOW_DEBUG:
+            print counter, " - Faces: ", faces_found, " -- Eyes: ", eyes_found
+        
+        #####
+        
+        if not NUMBER_OF_TESTS == None:
+            sys.stdout.write("\rCompleted test %i" % counter)
+            sys.stdout.flush()
+        
+        counter = counter + 1
         
         # Exit on ESC
         # The waitKey function is very necessary.
         # Besides waiting the specified seconds for a key press (and returning -1 if none),
         # it also handles any windowing events, such as creating windows with imshow()
         # http://stackoverflow.com/questions/5217519/opencv-cvwaitkey
+        # TODO: Wait for key only if showing images
         if cv2.waitKey(5) == 27:
             break
+        
+        # Exit after predefined number of tests, if set
+        if not NUMBER_OF_TESTS == None:
+            if counter > NUMBER_OF_TESTS:
+                sys.stdout.write("\n\n")
+                print NUMBER_OF_TESTS, "tests completed. Exiting..."
+                break
     
-    print (average/NUMBER_OF_TESTS)
+    print "Stopped."
+    print "Average loop time (ms):", (int(runtime_sum/counter*10000))/10.0, "--> fps:", (int(1/(runtime_sum/counter)*10)/10.0)
             
