@@ -26,9 +26,9 @@ NUMBER_OF_TESTS = None   # sets the number of frames to grab and process, set to
 
 # if SHOW is false, all SHOW_ settings are false
 # if SHOW is true, SHOW_ settings keep their assigned values
-SHOW = True
+SHOW = False
 
-SHOW_DEBUG = False           # shows print statements in the console
+SHOW_DEBUG = True           # shows print statements in the console
 
 SHOW_GRAYSCALE = True       # shows the grayscale image used by the detectMultiScale function
 SHOW_RT_FACE = True         # shows all detected faces for each frame
@@ -359,7 +359,7 @@ if __name__ == '__main__':
             
             # Draw all eyes
             if SHOW_RT_EYES:
-                display_image_face_area = display_image[smoothed_face[0]:smoothed_face[1], smoothed_face[2]:smoothed_face[3]]
+                display_image_face_area = display_image[smoothed_face[Y1]:smoothed_face[Y2], smoothed_face[X1]:smoothed_face[X2]]
                 draw_rects(display_image_face_area, eye_rects, (255, 0, 0))
             
             display_image = cv2.flip(display_image, 1)
