@@ -26,7 +26,7 @@ NUMBER_OF_TESTS = None   # sets the number of frames to grab and process, set to
 
 # if SHOW is false, all SHOW_ settings are false
 # if SHOW is true, SHOW_ settings keep their assigned values
-SHOW = False
+SHOW = True
 
 SHOW_DEBUG = True           # shows print statements in the console
 
@@ -34,7 +34,7 @@ SHOW_GRAYSCALE = True       # shows the grayscale image used by the detectMultiS
 SHOW_RT_FACE = True         # shows all detected faces for each frame
 SHOW_SMOOTH_FACE = True     # shows the smoothed_face rect
 SHOW_RT_EYES = True         # shows all detected eyes for each frame
-SHOW_SMOOTH_EYES = False    # shows the smoothed_eyes rects
+SHOW_SMOOTH_EYES = True     # shows the smoothed_eyes rects
 SHOW_STATS = True           # shows the stats overlaid on the image
 
 TIMEIT = True               # records time after each part, may slow down process
@@ -131,11 +131,38 @@ def detect_eyes(img, cascade):
 # Receive: face_rects, a list of numpy arrays containing x1, y1, x2, y2 for each face detected
 # Return: selected_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
+previous_face_rect = np.array([CAPTURE_WIDTH/2-5, CAPTURE_HEIGHT/2-5, CAPTURE_WIDTH/2+5, CAPTURE_HEIGHT/2+5])
+proximity = 0
+previous_proximity = np.zeros(4)
+px1 = px2 = py1 = py2 = 0
+P_CHANGE = CAPTURE_WIDTH/160
+
 def choose_face(face_rects):
-    #TODO: implement method
-    # selected_face = np.zeros(4, dtype=np.int32)
+    global proximity, previous_face_rect
+    
+    print "proximity: ", proximity
+    
     if len(face_rects) == 0:
+        proximity += P_CHANGE
         return None
+    
+    face_rect_array = face_rects[0]
+    if len(face_rects) == 1:
+        cx1 = 1 if (face_rect_array[X1] - previous_face_rect[X1]) < previous_proximity[X1] else 0
+        cy1 = 1 if (face_rect_array[Y1] - previous_face_rect[Y1]) < previous_proximity[Y1] else 0
+        cx2 = 1 if (face_rect_array[X2] - previous_face_rect[X2]) < previous_proximity[X2] else 0
+        cy2 = 1 if (face_rect_array[Y2] - previous_face_rect[Y2]) < previous_proximity[Y2] else 0
+        
+        print "c sum: ", (cx1 + cx2 + cy1 + cy2)
+        
+        if (cx1 + cy1 + cx2 + cy2) > 2:
+            previous_face_rect = face_rect_array
+            proximity -= P_CHANGE
+            return face_rect_array
+        else:
+            proximity += P_CHANGE
+            return previous_face_rect
+        
     selected_face = face_rects[0]
     
     return selected_face
@@ -320,6 +347,8 @@ if __name__ == '__main__':
         ##### choose correct eyes from detected eyes
         if TIMEIT:
             t7 = time.time()
+        
+        
         
         
         ##### smooth eyes using recent average
