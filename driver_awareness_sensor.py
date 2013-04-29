@@ -132,36 +132,96 @@ def detect_eyes(img, cascade):
 # Return: selected_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
 previous_face_rect = np.array([CAPTURE_WIDTH/2-5, CAPTURE_HEIGHT/2-5, CAPTURE_WIDTH/2+5, CAPTURE_HEIGHT/2+5])
-proximity = 0
-previous_proximity = np.zeros(4)
-px1 = px2 = py1 = py2 = 0
+#proximity = 0
+previous_proximity = np.zeros(4, dtype=np.uint)
+#px1 = px2 = py1 = py2 = 0
 P_CHANGE = CAPTURE_WIDTH/160
 
 def choose_face(face_rects):
-    global proximity, previous_face_rect
+    global previous_proximity, previous_face_rect
     
-    print "proximity: ", proximity
+    print "previous_proximity: ", previous_proximity
     
     if len(face_rects) == 0:
-        proximity += P_CHANGE
+        previous_proximity += P_CHANGE
         return None
     
-    face_rect_array = face_rects[0]
-    if len(face_rects) == 1:
-        cx1 = 1 if (face_rect_array[X1] - previous_face_rect[X1]) < previous_proximity[X1] else 0
-        cy1 = 1 if (face_rect_array[Y1] - previous_face_rect[Y1]) < previous_proximity[Y1] else 0
-        cx2 = 1 if (face_rect_array[X2] - previous_face_rect[X2]) < previous_proximity[X2] else 0
-        cy2 = 1 if (face_rect_array[Y2] - previous_face_rect[Y2]) < previous_proximity[Y2] else 0
+    elif len(face_rects) == 1:
+        face_rect_array = face_rects[0]
+        confidence = 0
         
-        print "c sum: ", (cx1 + cx2 + cy1 + cy2)
+        if abs(face_rect_array[X1] - previous_face_rect[X1]) < previous_proximity[X1]:
+            confidence += 1
+            previous_proximity[X1] -= P_CHANGE if previous_proximity[X1] >= P_CHANGE else 0
+        else:
+            confidence -= 1
+            previous_proximity[X1] += P_CHANGE
+            
+        if abs(face_rect_array[Y1] - previous_face_rect[Y1]) < previous_proximity[Y1]:
+            confidence += 1
+            previous_proximity[Y1] -= P_CHANGE if previous_proximity[Y1] >= P_CHANGE else 0
+        else:
+            confidence -= 1
+            previous_proximity[Y1] += P_CHANGE
         
-        if (cx1 + cy1 + cx2 + cy2) > 2:
+        if abs(face_rect_array[X2] - previous_face_rect[X2]) < previous_proximity[X2]:
+            confidence += 1
+            previous_proximity[X2] -= P_CHANGE if previous_proximity[X2] >= P_CHANGE else 0
+        else:
+            confidence -= 1
+            previous_proximity[X2] += P_CHANGE
+        
+        if abs(face_rect_array[Y2] - previous_face_rect[Y2]) < previous_proximity[Y2]:
+            confidence += 1
+            previous_proximity[Y2] -= P_CHANGE if previous_proximity[Y2] >= P_CHANGE else 0
+        else:
+            confidence -= 1
+            previous_proximity[Y2] += P_CHANGE
+        
+        # print "confidence: ", confidence
+        
+        if confidence >= 0:
             previous_face_rect = face_rect_array
-            proximity -= P_CHANGE
             return face_rect_array
         else:
-            proximity += P_CHANGE
-            return previous_face_rect
+            return None
+    
+    else:
+        confidence = np.zeros(len(face_rects))
+        counter = 0
+        
+        # generate confidence for all face_rects
+        for x1, y1, x2, y2 in face_rects:
+            confidence[counter] += 1 if abs(x1 - previous_face_rect[X1]) < previous_proximity[X1] else -1
+            confidence[counter] += 1 if abs(y1 - previous_face_rect[Y1]) < previous_proximity[Y1] else -1
+            confidence[counter] += 1 if abs(x2 - previous_face_rect[X2]) < previous_proximity[X2] else -1
+            confidence[counter] += 1 if abs(y2 - previous_face_rect[Y2]) < previous_proximity[Y2] else -1
+            
+        best = -1
+        best_conf = -4
+        
+        # find best face_rect
+        for i in range(len(face_rects)):
+            if confidence[i] >= best_conf:
+                best = i
+                best_conf = confidence[i]
+        
+        # update proximities and return best face_rect
+        if best_conf >= 0:
+            face_rect_array = face_rects[best]
+            
+            # add P_CHANGE if point is too far away, else subtract P_CHANGE if value will not result in zero
+            previous_proximity[X1] += P_CHANGE if abs(face_rect_array[X1] - previous_face_rect[X1]) >= previous_proximity[X1] else (-P_CHANGE if previous_proximity[X1] >= P_CHANGE else 0)
+            previous_proximity[Y1] += P_CHANGE if abs(face_rect_array[Y1] - previous_face_rect[Y1]) >= previous_proximity[Y1] else (-P_CHANGE if previous_proximity[Y1] >= P_CHANGE else 0)
+            previous_proximity[X2] += P_CHANGE if abs(face_rect_array[X2] - previous_face_rect[X2]) >= previous_proximity[X2] else (-P_CHANGE if previous_proximity[X2] >= P_CHANGE else 0)
+            previous_proximity[Y2] += P_CHANGE if abs(face_rect_array[Y2] - previous_face_rect[Y2]) >= previous_proximity[Y2] else (-P_CHANGE if previous_proximity[Y2] >= P_CHANGE else 0)
+            
+            previous_face_rect = face_rects[best]
+            
+            return face_rect_array
+        
+        else:
+            return None
         
     selected_face = face_rects[0]
     
@@ -173,12 +233,10 @@ def choose_face(face_rects):
 # Return: smoothed_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
 def smooth_face(face_rect):
-    #TODO: update method to return correct types
-    
     global smooth_face_counter, smooth_face_history
     
     # if face_rect contains a face, add it to the history, replacing the oldest
-    if not face_rect == None:
+    if not face_rect:
         smooth_face_history[smooth_face_counter] = face_rect
         smooth_face_counter = (smooth_face_counter + 1) % SMOOTH_FACE_MAX
         
@@ -272,6 +330,9 @@ if __name__ == '__main__':
     
     # create video capture
     cam = cv2.VideoCapture(-1)
+    if not cam.isOpened():
+        print "No camera found. Exiting..."
+        sys.exit()
     
     # set capture settings
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH)
@@ -293,6 +354,8 @@ if __name__ == '__main__':
     i = 0
     
     while True:
+        if SHOW_DEBUG:
+            print "------------------------------------------"
         ##### read image from camera
         if TIMEIT:
             t1 = time.time()
@@ -375,7 +438,7 @@ if __name__ == '__main__':
             
             # Draw all faces
             if SHOW_RT_FACE:
-                draw_rects(display_image, face_rects, (0, 255, 0))
+                draw_rects(display_image, face_rects, (255, 255, 255))
             
             # Draw smoothed face
             if SHOW_SMOOTH_FACE:
