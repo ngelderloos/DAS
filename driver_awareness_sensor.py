@@ -4,6 +4,7 @@ import cv2.cv as cv
 import time
 import numpy as np
 import sys
+import math
 
 ####################################################################################################
 # CONFIGURATION
@@ -310,6 +311,57 @@ def draw_rects(img, rects, color):
 def draw_rect(img, rect, color):
     cv2.rectangle(img, (rect[0], rect[1]), (rect[2], rect[3]), color, 2)
     
+    
+past_eye_averages = np.zeros((CAPTURE_WIDTH,2), dtype=np.int32)
+past_eye_counter = 0
+
+def draw_eye_line(img, face_rect, color):
+    global past_eye_counter
+    # face properties
+    # print "width, height: ", (face_rect[X2] - face_rect[X1]), (face_rect[Y2] - face_rect[Y1])
+    width, height = face_rect[X2] - face_rect[X1], face_rect[Y2] - face_rect[Y1]
+    
+    yt = int(height * 0.25)
+    yb = int(height * 0.50)
+    xl = int(width * 0.45)
+    xr = int(width * 0.20)
+    
+    cv2.line(img, (face_rect[X1], face_rect[Y1]+yt), (face_rect[X2], face_rect[Y1]+yt), color, 1)
+    cv2.line(img, (face_rect[X1], face_rect[Y1]+yb), (face_rect[X2], face_rect[Y1]+yb), color, 1)
+    
+    cv2.line(img, (face_rect[X1]+xr, face_rect[Y1]), (face_rect[X1]+xr, face_rect[Y2]), color, 1)
+    cv2.line(img, (face_rect[X1]+xl, face_rect[Y1]), (face_rect[X1]+xl, face_rect[Y2]), color, 1)
+    cv2.line(img, (face_rect[X2]-xl, face_rect[Y1]), (face_rect[X2]-xl, face_rect[Y2]), color, 1)
+    cv2.line(img, (face_rect[X2]-xr, face_rect[Y1]), (face_rect[X2]-xr, face_rect[Y2]), color, 1)
+    
+    right_eye_average = np.mean(img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X1]+xr:face_rect[X1]+xl])
+    left_eye_average = np.mean(img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X2]-xl:face_rect[X2]-xr])
+    # print "right_eye_average: ", right_eye_average
+    
+    if math.isnan(right_eye_average):
+        right_eye_average = 0
+    
+    if math.isnan(left_eye_average):
+        left_eye_average = 0
+    
+    past_eye_averages[past_eye_counter] = right_eye_average
+    
+    right_eye_average_img = (img * 0) + int(right_eye_average)
+    
+    for i in range(CAPTURE_WIDTH):
+        c_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
+        cv2.circle(right_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][1]), 1, c_color, -1)
+        
+    draw_text(right_eye_average_img, 'Average: %.1f' % (int(right_eye_average*100)/100), (20, 20))
+    cv2.imshow('Right Eye', right_eye_average_img)
+    
+    combined = np.hstack((img, right_eye_average_img))
+    cv2.imshow('Capture', combined)
+    
+    past_eye_counter = (past_eye_counter + 1) % CAPTURE_WIDTH
+    
+    
+    
 #---------------------------------------------------------------------------------------------------
 # draw_text() draws the given text on the image at the specified coordinates.
 # Receive: img, an image
@@ -452,6 +504,8 @@ if __name__ == '__main__':
                     color = color - 16 if color >= 15 else 0
                 
                 draw_rect(display_image, smoothed_face, (0, color, (255 - color)))
+                
+                draw_eye_line(display_image, smoothed_face, (31, 104, 255))
             
             # Draw all eyes
             if SHOW_RT_EYES:
