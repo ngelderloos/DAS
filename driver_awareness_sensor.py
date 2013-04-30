@@ -43,11 +43,6 @@ TIMEIT = True               # records time after each part, may slow down proces
 # End Configuration
 ####################################################################################################
 
-SMOOTH_FACE_MAX = 10 # number of frames to take face rect average
-smooth_face_history = np.zeros((SMOOTH_FACE_MAX, 4), dtype=np.int32)
-smooth_face_history[0] = [0, 0, 10, 10] # avoids initial size of zero for smooth_face() if no face is found
-smooth_face_counter = 0
-
 CAPTURE_HEIGHT = CAPTURE_WIDTH * 3 / 4
 
 X1, Y1, X2, Y2 = 0, 1, 2, 3
@@ -114,7 +109,7 @@ def detect_eyes(img, cascade):
     # height = len(img)
     min_eye_size = len(img)/5
     #TODO? max_eye_size = len(img)/2
-    rects = cascade.detectMultiScale(img, scaleFactor=2, minNeighbors=5, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
+    rects = cascade.detectMultiScale(img, scaleFactor=2, minNeighbors=4, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
     if len(rects) == 0:
         return []
     rects[:,2:] += rects[:,:2]
@@ -132,9 +127,7 @@ def detect_eyes(img, cascade):
 # Return: selected_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
 previous_face_rect = np.array([CAPTURE_WIDTH/2-5, CAPTURE_HEIGHT/2-5, CAPTURE_WIDTH/2+5, CAPTURE_HEIGHT/2+5])
-#proximity = 0
 previous_proximity = np.zeros(4, dtype=np.uint)
-#px1 = px2 = py1 = py2 = 0
 P_CHANGE = CAPTURE_WIDTH/160
 
 def choose_face(face_rects):
@@ -155,7 +148,7 @@ def choose_face(face_rects):
             previous_proximity[X1] -= P_CHANGE if previous_proximity[X1] >= P_CHANGE else 0
         else:
             confidence -= 1
-            previous_proximity[X1] += P_CHANGE
+            previous_proximity[X1] += P_CHANGE if previous_proximity[X1] <= CAPTURE_WIDTH else 0
             
         if abs(face_rect_array[Y1] - previous_face_rect[Y1]) < previous_proximity[Y1]:
             confidence += 1
@@ -211,10 +204,10 @@ def choose_face(face_rects):
             face_rect_array = face_rects[best]
             
             # add P_CHANGE if point is too far away, else subtract P_CHANGE if value will not result in zero
-            previous_proximity[X1] += P_CHANGE if abs(face_rect_array[X1] - previous_face_rect[X1]) >= previous_proximity[X1] else (-P_CHANGE if previous_proximity[X1] >= P_CHANGE else 0)
-            previous_proximity[Y1] += P_CHANGE if abs(face_rect_array[Y1] - previous_face_rect[Y1]) >= previous_proximity[Y1] else (-P_CHANGE if previous_proximity[Y1] >= P_CHANGE else 0)
-            previous_proximity[X2] += P_CHANGE if abs(face_rect_array[X2] - previous_face_rect[X2]) >= previous_proximity[X2] else (-P_CHANGE if previous_proximity[X2] >= P_CHANGE else 0)
-            previous_proximity[Y2] += P_CHANGE if abs(face_rect_array[Y2] - previous_face_rect[Y2]) >= previous_proximity[Y2] else (-P_CHANGE if previous_proximity[Y2] >= P_CHANGE else 0)
+            previous_proximity[X1] += P_CHANGE if abs(face_rect_array[X1] - previous_face_rect[X1]) >= previous_proximity[X1] and previous_proximity[X1] < CAPTURE_WIDTH else (-P_CHANGE if previous_proximity[X1] >= P_CHANGE else 0)
+            previous_proximity[Y1] += P_CHANGE if abs(face_rect_array[Y1] - previous_face_rect[Y1]) >= previous_proximity[Y1] and previous_proximity[Y1] < CAPTURE_HEIGHT else (-P_CHANGE if previous_proximity[Y1] >= P_CHANGE else 0)
+            previous_proximity[X2] += P_CHANGE if abs(face_rect_array[X2] - previous_face_rect[X2]) >= previous_proximity[X2] and previous_proximity[X2] < CAPTURE_WIDTH else (-P_CHANGE if previous_proximity[X2] >= P_CHANGE else 0)
+            previous_proximity[Y2] += P_CHANGE if abs(face_rect_array[Y2] - previous_face_rect[Y2]) >= previous_proximity[Y2] and previous_proximity[Y2] < CAPTURE_HEIGHT else (-P_CHANGE if previous_proximity[Y2] >= P_CHANGE else 0)
             
             previous_face_rect = face_rects[best]
             
@@ -232,23 +225,34 @@ def choose_face(face_rects):
 # Receive: face_rect, a numpy array containing x1, y1, x2, y2
 # Return: smoothed_face, a numpy array containing x1, y1, x2, y2
 #---------------------------------------------------------------------------------------------------
+SMOOTH_FACE_MAX = 5 # number of frames to take face rect average
+smooth_face_history = np.zeros((SMOOTH_FACE_MAX, 4), dtype=np.int32)
+smooth_face_history[0] = [0, 0, SMOOTH_FACE_MAX, SMOOTH_FACE_MAX] # avoids initial size of zero for smooth_face() if no face is found
+smooth_face_counter = 0
+
 def smooth_face(face_rect):
     global smooth_face_counter, smooth_face_history
     
     # if face_rect contains a face, add it to the history, replacing the oldest
-    if not face_rect:
+    if face_rect != None:
         smooth_face_history[smooth_face_counter] = face_rect
         smooth_face_counter = (smooth_face_counter + 1) % SMOOTH_FACE_MAX
-        
-    x1sum = y1sum = x2sum = y2sum = 0
     
-    for x1, y1, x2, y2 in smooth_face_history:
-        x1sum += x1
-        y1sum += y1
-        x2sum += x2
-        y2sum += y2
+    smoothed_face = np.mean(smooth_face_history, axis=0, dtype=np.int)
+    print "smooth_face_mean: ", smoothed_face
     
-    smoothed_face = np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])
+    # x1sum = y1sum = x2sum = y2sum = 0
+    
+    # for x1, y1, x2, y2 in smooth_face_history:
+        # x1sum += x1
+        # y1sum += y1
+        # x2sum += x2
+        # y2sum += y2
+    
+    # smoothed_face = np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])
+    
+    # smoothed_face = smooth_face_mean / SMOOTH_FACE_MAX
+    # print "smoothed_face: ", smoothed_face
     
     return smoothed_face
     
