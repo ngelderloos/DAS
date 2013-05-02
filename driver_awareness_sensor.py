@@ -282,8 +282,86 @@ def detect_eye_state(eye_rects):
     eye_state = []
     return eye_state
     
+#---------------------------------------------------------------------------------------------------
+# draw_eye_lines() draws lines on the face corresponding to the location of the eyes in proportion 
+# to the size of the face. It then calculates the average brightness of each eye and graphs it over
+# time.
+# Receieve: img, the image to calculate and draw the eyes on
+#           face_rect, the coordinates of the rectangle containing the face
+#           color, the color of the eye lines
+# Return: draw_img, the image with the eye lines
+#         left_eye_average_img, an image with the background as the average brightness for the left
+#                               eye and overlaid with a graph of brightness over time
+#         right_eye_average_img, an image with the background as the average brightness for the
+#                                right eye and overlaid with a graph of the brightness over time
+#---------------------------------------------------------------------------------------------------
+past_eye_averages = np.zeros((CAPTURE_WIDTH,2), dtype=np.int32)
+past_eye_counter = 0
+    
+def draw_eye_lines(img, face_rect, color):
+    global past_eye_counter
+    
+    # face properties
+    width, height = face_rect[X2] - face_rect[X1], face_rect[Y2] - face_rect[Y1]
+    
+    # create new image to draw on
+    draw_img = img.copy()
+    
+    # proportional values for eye lines
+    yt = int(height * 0.25) # y-top (from Y1)
+    yb = int(height * 0.50) # y-bottom (from Y1)
+    xl = int(width * 0.45) # x-left (from X1, and reversed from X2)
+    xr = int(width * 0.20) # x-right (from X1, and reversed from X2)
+    
+    # horizontal lines
+    cv2.line(draw_img, (face_rect[X1], face_rect[Y1]+yt), (face_rect[X2], face_rect[Y1]+yt), color, 1)
+    cv2.line(draw_img, (face_rect[X1], face_rect[Y1]+yb), (face_rect[X2], face_rect[Y1]+yb), color, 1)
+    
+    # vertical lines
+    cv2.line(draw_img, (face_rect[X1]+xr, face_rect[Y1]), (face_rect[X1]+xr, face_rect[Y2]), color, 1)
+    cv2.line(draw_img, (face_rect[X1]+xl, face_rect[Y1]), (face_rect[X1]+xl, face_rect[Y2]), color, 1)
+    cv2.line(draw_img, (face_rect[X2]-xl, face_rect[Y1]), (face_rect[X2]-xl, face_rect[Y2]), color, 1)
+    cv2.line(draw_img, (face_rect[X2]-xr, face_rect[Y1]), (face_rect[X2]-xr, face_rect[Y2]), color, 1)
+    
+    # calculate the average value of the eye parts of the image
+    right_eye_average = np.mean(draw_img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X1]+xr:face_rect[X1]+xl])
+    left_eye_average = np.mean(draw_img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X2]-xl:face_rect[X2]-xr])
+    
+    # prevent averages from being NaN
+    right_eye_average = 0 if math.isnan(right_eye_average) else right_eye_average
+    left_eye_average = 0 if math.isnan(left_eye_average) else left_eye_average
+    
+    # update array for current point, based on past_eye_counter
+    past_eye_averages[past_eye_counter][0] = right_eye_average
+    past_eye_averages[past_eye_counter][1] = left_eye_average
+    
+    # create images to draw graphs on (clear original image to get the same size, then set all 
+    # colors in image to be the same as the average brightness
+    right_eye_average_img = (draw_img * 0) + int(right_eye_average)
+    left_eye_average_img = (draw_img * 0) + int(left_eye_average)
+    
+    # draw the graph of brightness over time
+    for i in range(CAPTURE_WIDTH):
+        # set current point to red, for visibility
+        r_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
+        l_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
+        
+        # draw each point from array onto respective image
+        cv2.circle(right_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][0]), 1, r_color, -1)
+        cv2.circle(left_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][1]), 1, l_color, -1)
+        
+    # draw descriptive text on image for identification
+    draw_text(right_eye_average_img, 'Right Eye Average: %.1f' % (int(right_eye_average*100)/100), (20, 20))
+    draw_text(left_eye_average_img, 'Left Eye Average: %.1f' % (int(left_eye_average*100)/100), (20, 20))
+    
+    # update past_eye_counter
+    past_eye_counter = (past_eye_counter + 1) % CAPTURE_WIDTH
+    
+    return draw_img, left_eye_average_img, right_eye_average_img
+    
+    
 ####################################################################################################
-# Drawing functions for demo and debug.
+# Drawing and capture functions for demo and debug.
 ####################################################################################################
 
 #---------------------------------------------------------------------------------------------------
@@ -297,77 +375,25 @@ def draw_rects(img, rects, color):
     for x1, y1, x2, y2 in rects:
         cv2.rectangle(img, (x1, y1), (x2, y2), color, 2)
 
+#---------------------------------------------------------------------------------------------------
+# draw_rect() draws a single rectange on the given image using the coordinates provided and line 
+# width of two pixels.
+# Receive: img, an image
+#          rect, a rectange, represented as numpy.ndarray
+#          color, the color of the rectangle
+#---------------------------------------------------------------------------------------------------
 def draw_rect(img, rect, color):
     cv2.rectangle(img, (rect[0], rect[1]), (rect[2], rect[3]), color, 2)
-    
-    
-past_eye_averages = np.zeros((CAPTURE_WIDTH,2), dtype=np.int32)
-past_eye_counter = 0
-    
-def draw_eye_lines(img, face_rect, color):
-    global past_eye_counter
-    
-    # face properties
-    width, height = face_rect[X2] - face_rect[X1], face_rect[Y2] - face_rect[Y1]
-    
-    draw_img = img.copy()
-    
-    yt = int(height * 0.25)
-    yb = int(height * 0.50)
-    xl = int(width * 0.45)
-    xr = int(width * 0.20)
-    
-    # horizontal lines
-    cv2.line(draw_img, (face_rect[X1], face_rect[Y1]+yt), (face_rect[X2], face_rect[Y1]+yt), color, 1)
-    cv2.line(draw_img, (face_rect[X1], face_rect[Y1]+yb), (face_rect[X2], face_rect[Y1]+yb), color, 1)
-    
-    # vertical lines
-    cv2.line(draw_img, (face_rect[X1]+xr, face_rect[Y1]), (face_rect[X1]+xr, face_rect[Y2]), color, 1)
-    cv2.line(draw_img, (face_rect[X1]+xl, face_rect[Y1]), (face_rect[X1]+xl, face_rect[Y2]), color, 1)
-    cv2.line(draw_img, (face_rect[X2]-xl, face_rect[Y1]), (face_rect[X2]-xl, face_rect[Y2]), color, 1)
-    cv2.line(draw_img, (face_rect[X2]-xr, face_rect[Y1]), (face_rect[X2]-xr, face_rect[Y2]), color, 1)
-    
-    right_eye_average = np.mean(draw_img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X1]+xr:face_rect[X1]+xl])
-    left_eye_average = np.mean(draw_img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X2]-xl:face_rect[X2]-xr])
-    
-    if math.isnan(right_eye_average):
-        right_eye_average = 0
-    
-    if math.isnan(left_eye_average):
-        left_eye_average = 0
-    
-    past_eye_averages[past_eye_counter][0] = right_eye_average
-    past_eye_averages[past_eye_counter][1] = left_eye_average
-    
-    right_eye_average_img = (draw_img * 0) + int(right_eye_average)
-    left_eye_average_img = (draw_img * 0) + int(left_eye_average)
-    
-    for i in range(CAPTURE_WIDTH):
-        r_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
-        l_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
-        
-        cv2.circle(right_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][0]), 1, r_color, -1)
-        cv2.circle(left_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][1]), 1, l_color, -1)
-        
-    draw_text(right_eye_average_img, 'Right Eye Average: %.1f' % (int(right_eye_average*100)/100), (20, 20))
-    draw_text(left_eye_average_img, 'Left Eye Average: %.1f' % (int(left_eye_average*100)/100), (20, 20))
-    # cv2.imshow('Right Eye', right_eye_average_img)
-    
-    combined = np.hstack((cv2.flip(img, 1), left_eye_average_img, right_eye_average_img))
-    # cv2.imshow('Capture', combined)
-    
-    past_eye_counter = (past_eye_counter + 1) % CAPTURE_WIDTH
-    
-    return draw_img, left_eye_average_img, right_eye_average_img
-    
-    # if CAPTURE_VIDEO:
-        # vid.write(combined)
 
+#---------------------------------------------------------------------------------------------------
+# capture_video() combines nine image arrays (all the same size and number of channels) and records 
+# the frame to a video file. Also displays the video feed for demo purposes.
+# Receive: i11 - i33, image arrays, all the same size
+#---------------------------------------------------------------------------------------------------
 def capture_video(i11, i12, i13, i21, i22, i23, i31, i32, i33):
-    # global vid
-    cv2.imshow('Video Capture', np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
+    if SHOW:
+        cv2.imshow('Video Capture', np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
     vid.write(np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
-    
     
 #---------------------------------------------------------------------------------------------------
 # draw_text() draws the given text on the image at the specified coordinates.
@@ -417,7 +443,6 @@ if __name__ == '__main__':
             t1 = time.time()
         
         frame = read_frame(cam)
-        img = frame #REMOVE
         
         
         ##### convert to grayscale and equalize
@@ -431,7 +456,6 @@ if __name__ == '__main__':
         if TIMEIT:
             t3 = time.time()
         
-        # print len(gray), len(gray[0])
         face_rects = detect_faces(gray, face_cascade)
         faces_found = len(face_rects) # number of faces found
         
@@ -486,6 +510,9 @@ if __name__ == '__main__':
         ##### Display stuff for debug/demo
         if TIMEIT:
             t11 = time.time()
+            
+        # total time for computational features
+        runtime_sum += t11 - t1
         
         if SHOW:
             display_image = frame.copy()
@@ -541,22 +568,15 @@ if __name__ == '__main__':
             draw_text(display_alle, 'All Eyes', (20, 20))
             draw_text(display_sf, 'Smoothed Face', (20, 20))
             
-            capture_video(display_raw, display_gs, display_eqgs, display_allf, display_alle, display_stats, display_sf, display_lea, display_rea)
-            
-        
-        
-        # Display stats on console
-        runtime_sum += t11 - t1
+            if CAPTURE_VIDEO:
+                capture_video(display_raw, display_gs, display_eqgs, display_allf, display_alle, display_stats, display_sf, display_lea, display_rea)
         
         if SHOW_DEBUG:
             print counter, " - Faces: ", faces_found, " -- Eyes: ", eyes_found
         
         #####
         
-        if not NUMBER_OF_TESTS == None:
-            sys.stdout.write("\rCompleted test %i" % counter)
-            sys.stdout.flush()
-        
+        # Increment run counter
         counter = counter + 1
         
         # Exit on ESC
@@ -568,13 +588,19 @@ if __name__ == '__main__':
         if cv2.waitKey(5) == 27:
             break
         
-        # Exit after predefined number of tests, if set
+        # Run set number of tests, displaying the number of completed tests. Works best with debug
+        # off.
         if not NUMBER_OF_TESTS == None:
+            sys.stdout.write("\rCompleted test %i" % counter)
+            sys.stdout.flush()
+            
+            # Exit after set number of tests.
             if counter > NUMBER_OF_TESTS:
                 sys.stdout.write("\n\n")
                 print NUMBER_OF_TESTS, "tests completed. Exiting..."
                 break
     
+    # End of program messages
     print "Stopped."
     print "Average loop time (ms):", (int(runtime_sum/counter*10000))/10.0, "--> fps:", (int(1/(runtime_sum/counter)*10)/10.0)
             
