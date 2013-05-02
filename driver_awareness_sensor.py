@@ -40,6 +40,8 @@ SHOW_STATS = True           # shows the stats overlaid on the image
 
 TIMEIT = True               # records time after each part, may slow down process
 
+CAPTURE_VIDEO = True        # records video while running
+
 ####################################################################################################
 # End Configuration
 ####################################################################################################
@@ -242,19 +244,6 @@ def smooth_face(face_rect):
     smoothed_face = np.mean(smooth_face_history, axis=0, dtype=np.int)
     print "smooth_face_mean: ", smoothed_face
     
-    # x1sum = y1sum = x2sum = y2sum = 0
-    
-    # for x1, y1, x2, y2 in smooth_face_history:
-        # x1sum += x1
-        # y1sum += y1
-        # x2sum += x2
-        # y2sum += y2
-    
-    # smoothed_face = np.array([int(x1sum/SMOOTH_FACE_MAX), int(y1sum/SMOOTH_FACE_MAX), int(x2sum/SMOOTH_FACE_MAX), int(y2sum/SMOOTH_FACE_MAX)])
-    
-    # smoothed_face = smooth_face_mean / SMOOTH_FACE_MAX
-    # print "smoothed_face: ", smoothed_face
-    
     return smoothed_face
     
 #---------------------------------------------------------------------------------------------------
@@ -314,29 +303,32 @@ def draw_rect(img, rect, color):
     
 past_eye_averages = np.zeros((CAPTURE_WIDTH,2), dtype=np.int32)
 past_eye_counter = 0
-
-def draw_eye_line(img, face_rect, color):
+    
+def draw_eye_lines(img, face_rect, color):
     global past_eye_counter
+    
     # face properties
-    # print "width, height: ", (face_rect[X2] - face_rect[X1]), (face_rect[Y2] - face_rect[Y1])
     width, height = face_rect[X2] - face_rect[X1], face_rect[Y2] - face_rect[Y1]
+    
+    draw_img = img.copy()
     
     yt = int(height * 0.25)
     yb = int(height * 0.50)
     xl = int(width * 0.45)
     xr = int(width * 0.20)
     
-    cv2.line(img, (face_rect[X1], face_rect[Y1]+yt), (face_rect[X2], face_rect[Y1]+yt), color, 1)
-    cv2.line(img, (face_rect[X1], face_rect[Y1]+yb), (face_rect[X2], face_rect[Y1]+yb), color, 1)
+    # horizontal lines
+    cv2.line(draw_img, (face_rect[X1], face_rect[Y1]+yt), (face_rect[X2], face_rect[Y1]+yt), color, 1)
+    cv2.line(draw_img, (face_rect[X1], face_rect[Y1]+yb), (face_rect[X2], face_rect[Y1]+yb), color, 1)
     
-    cv2.line(img, (face_rect[X1]+xr, face_rect[Y1]), (face_rect[X1]+xr, face_rect[Y2]), color, 1)
-    cv2.line(img, (face_rect[X1]+xl, face_rect[Y1]), (face_rect[X1]+xl, face_rect[Y2]), color, 1)
-    cv2.line(img, (face_rect[X2]-xl, face_rect[Y1]), (face_rect[X2]-xl, face_rect[Y2]), color, 1)
-    cv2.line(img, (face_rect[X2]-xr, face_rect[Y1]), (face_rect[X2]-xr, face_rect[Y2]), color, 1)
+    # vertical lines
+    cv2.line(draw_img, (face_rect[X1]+xr, face_rect[Y1]), (face_rect[X1]+xr, face_rect[Y2]), color, 1)
+    cv2.line(draw_img, (face_rect[X1]+xl, face_rect[Y1]), (face_rect[X1]+xl, face_rect[Y2]), color, 1)
+    cv2.line(draw_img, (face_rect[X2]-xl, face_rect[Y1]), (face_rect[X2]-xl, face_rect[Y2]), color, 1)
+    cv2.line(draw_img, (face_rect[X2]-xr, face_rect[Y1]), (face_rect[X2]-xr, face_rect[Y2]), color, 1)
     
-    right_eye_average = np.mean(img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X1]+xr:face_rect[X1]+xl])
-    left_eye_average = np.mean(img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X2]-xl:face_rect[X2]-xr])
-    # print "right_eye_average: ", right_eye_average
+    right_eye_average = np.mean(draw_img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X1]+xr:face_rect[X1]+xl])
+    left_eye_average = np.mean(draw_img[face_rect[Y1]+yt:face_rect[Y1]+yb, face_rect[X2]-xl:face_rect[X2]-xr])
     
     if math.isnan(right_eye_average):
         right_eye_average = 0
@@ -344,22 +336,37 @@ def draw_eye_line(img, face_rect, color):
     if math.isnan(left_eye_average):
         left_eye_average = 0
     
-    past_eye_averages[past_eye_counter] = right_eye_average
+    past_eye_averages[past_eye_counter][0] = right_eye_average
+    past_eye_averages[past_eye_counter][1] = left_eye_average
     
-    right_eye_average_img = (img * 0) + int(right_eye_average)
+    right_eye_average_img = (draw_img * 0) + int(right_eye_average)
+    left_eye_average_img = (draw_img * 0) + int(left_eye_average)
     
     for i in range(CAPTURE_WIDTH):
-        c_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
-        cv2.circle(right_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][1]), 1, c_color, -1)
+        r_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
+        l_color = (0, 0, 255) if i == past_eye_counter else (0, 0, 0)
         
-    draw_text(right_eye_average_img, 'Average: %.1f' % (int(right_eye_average*100)/100), (20, 20))
-    cv2.imshow('Right Eye', right_eye_average_img)
+        cv2.circle(right_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][0]), 1, r_color, -1)
+        cv2.circle(left_eye_average_img, (i, CAPTURE_HEIGHT-past_eye_averages[i][1]), 1, l_color, -1)
+        
+    draw_text(right_eye_average_img, 'Right Eye Average: %.1f' % (int(right_eye_average*100)/100), (20, 20))
+    draw_text(left_eye_average_img, 'Left Eye Average: %.1f' % (int(left_eye_average*100)/100), (20, 20))
+    # cv2.imshow('Right Eye', right_eye_average_img)
     
-    combined = np.hstack((img, right_eye_average_img))
-    cv2.imshow('Capture', combined)
+    combined = np.hstack((cv2.flip(img, 1), left_eye_average_img, right_eye_average_img))
+    # cv2.imshow('Capture', combined)
     
     past_eye_counter = (past_eye_counter + 1) % CAPTURE_WIDTH
     
+    return draw_img, left_eye_average_img, right_eye_average_img
+    
+    # if CAPTURE_VIDEO:
+        # vid.write(combined)
+
+def capture_video(i11, i12, i13, i21, i22, i23, i31, i32, i33):
+    # global vid
+    cv2.imshow('Video Capture', np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
+    vid.write(np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
     
     
 #---------------------------------------------------------------------------------------------------
@@ -394,20 +401,13 @@ if __name__ == '__main__':
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH)
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
     
+    if CAPTURE_VIDEO:
+        vid = cv2.VideoWriter("C:\\Users\\nag5\\Documents\\GitHub\\DAS\\captures\\" + str(int(time.time())) + ".mpeg", cv.CV_FOURCC('P','I','M','1'), 30.0, (CAPTURE_WIDTH*3, CAPTURE_HEIGHT*3))
+
     runtime_sum = 0.0000001 # prevent divide by zero
     counter = 1
     
-    frame_read_time, face_detect_time, frames_per_second = 0, 0, 0
-    display_frt, display_fdt, display_fps = 0, 0, 0
-    # counter = 0
-    previous_display_time = 0
-    
     color = 0
-    
-    
-    
-    average = 0.0
-    i = 0
     
     while True:
         if SHOW_DEBUG:
@@ -464,25 +464,23 @@ if __name__ == '__main__':
         
         
         ##### choose correct eyes from detected eyes
-        if TIMEIT:
-            t7 = time.time()
-        
-        
+        # if TIMEIT:
+            # t7 = time.time()
         
         
         ##### smooth eyes using recent average
-        if TIMEIT: 
-            t8 = time.time()
+        # if TIMEIT: 
+            # t8 = time.time()
         
         
         ##### detect the state of the eyes
-        if TIMEIT:
-            t9 = time.time()
+        # if TIMEIT:
+            # t9 = time.time()
         
         
         ##### output alert if state of eyes is dangerous
-        if TIMEIT:
-            t10 = time.time()
+        # if TIMEIT:
+            # t10 = time.time()
         
         
         ##### Display stuff for debug/demo
@@ -490,11 +488,21 @@ if __name__ == '__main__':
             t11 = time.time()
         
         if SHOW:
-            display_image = img.copy()
+            display_image = frame.copy()
+            
+            display_raw = frame.copy()
+            display_gs = cv2.cvtColor(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
+            display_eqgs = cv2.cvtColor(cv2.equalizeHist(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)), cv2.COLOR_GRAY2BGR)
+            display_allf = frame.copy()
+            display_alle = frame.copy()
+            display_stats = frame.copy() * 0
+            display_sf = frame.copy()
+            display_lea = frame.copy()
+            display_rea = frame.copy()
             
             # Draw all faces
             if SHOW_RT_FACE:
-                draw_rects(display_image, face_rects, (255, 255, 255))
+                draw_rects(display_allf, face_rects, (255, 255, 255))
             
             # Draw smoothed face
             if SHOW_SMOOTH_FACE:
@@ -503,28 +511,40 @@ if __name__ == '__main__':
                 else:
                     color = color - 16 if color >= 15 else 0
                 
-                draw_rect(display_image, smoothed_face, (0, color, (255 - color)))
+                draw_rect(display_sf, smoothed_face, (0, color, (255 - color)))
+                draw_rect(display_alle, smoothed_face, (0, color, (255 - color)))
                 
-                draw_eye_line(display_image, smoothed_face, (31, 104, 255))
+                display_sf, display_lea, display_rea = draw_eye_lines(display_sf, smoothed_face, (31, 104, 255))
             
             # Draw all eyes
             if SHOW_RT_EYES:
-                display_image_face_area = display_image[smoothed_face[Y1]:smoothed_face[Y2], smoothed_face[X1]:smoothed_face[X2]]
-                draw_rects(display_image_face_area, eye_rects, (255, 0, 0))
+                display_alle_face_area = display_alle[smoothed_face[Y1]:smoothed_face[Y2], smoothed_face[X1]:smoothed_face[X2]]
+                draw_rects(display_alle_face_area, eye_rects, (255, 0, 0))
             
             display_image = cv2.flip(display_image, 1)
             
             # Print stats on image
             if SHOW_STATS and TIMEIT:
-                draw_text(display_image, 'Average time: %.1f ms' % (runtime_sum/counter*1000), (20, 20))
-                draw_text(display_image, 'Average fps: %.1f' % (1/(runtime_sum/counter)), (20, 40))
+                draw_text(display_stats, 'Average time: %.1f ms' % (runtime_sum/counter*1000), (20, 20))
+                draw_text(display_stats, 'Average fps: %.1f' % (1/(runtime_sum/counter)), (20, 40))
                             
-            cv2.imshow('Face Detector', display_image)
+            # cv2.imshow('Face Detector', display_image)
             
             if SHOW_GRAYSCALE:
                 gray = cv2.flip(gray, 1)
-                cv2.imshow('Grayscale', gray)
+                # cv2.imshow('Grayscale', gray)
             
+            draw_text(display_raw, 'Raw', (20, 20))
+            draw_text(display_gs, 'Grayscale', (20, 20))
+            draw_text(display_eqgs, 'Equalized Grayscale', (20, 20))
+            draw_text(display_allf, 'All Faces', (20, 20))
+            draw_text(display_alle, 'All Eyes', (20, 20))
+            draw_text(display_sf, 'Smoothed Face', (20, 20))
+            
+            capture_video(display_raw, display_gs, display_eqgs, display_allf, display_alle, display_stats, display_sf, display_lea, display_rea)
+            
+        
+        
         # Display stats on console
         runtime_sum += t11 - t1
         
