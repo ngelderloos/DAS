@@ -6,6 +6,12 @@ import numpy as np
 import sys
 import math
 
+#TODO: 
+# * place window in correct spot
+# * generate proper output in console
+# * presentation
+#
+
 ####################################################################################################
 # CONFIGURATION
 #################################################################################################### 
@@ -29,7 +35,7 @@ NUMBER_OF_TESTS = None   # sets the number of frames to grab and process, set to
 # if SHOW is true, SHOW_ settings keep their assigned values
 SHOW = True
 
-SHOW_DEBUG = True           # shows print statements in the console
+SHOW_DEBUG = False           # shows print statements in the console
 
 SHOW_GRAYSCALE = True       # shows the grayscale image used by the detectMultiScale function
 SHOW_RT_FACE = True         # shows all detected faces for each frame
@@ -37,10 +43,13 @@ SHOW_SMOOTH_FACE = True     # shows the smoothed_face rect
 SHOW_RT_EYES = True         # shows all detected eyes for each frame
 SHOW_SMOOTH_EYES = True     # shows the smoothed_eyes rects
 SHOW_STATS = True           # shows the stats overlaid on the image
+SHOW_SCREEN = True
 
 TIMEIT = True               # records time after each part, may slow down process
 
 CAPTURE_VIDEO = True        # records video while running
+
+MOVE_WINDOW = False         # Allow the window to be moved
 
 ####################################################################################################
 # End Configuration
@@ -112,7 +121,7 @@ def detect_eyes(img, cascade):
     # height = len(img)
     min_eye_size = len(img)/5
     #TODO? max_eye_size = len(img)/2
-    rects = cascade.detectMultiScale(img, scaleFactor=2, minNeighbors=4, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
+    rects = cascade.detectMultiScale(img, scaleFactor=1.5, minNeighbors=4, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
     if len(rects) == 0:
         return []
     rects[:,2:] += rects[:,:2]
@@ -136,7 +145,8 @@ P_CHANGE = CAPTURE_WIDTH/160
 def choose_face(face_rects):
     global previous_proximity, previous_face_rect
     
-    print "previous_proximity: ", previous_proximity
+    if SHOW_DEBUG:
+        print "previous_proximity: ", previous_proximity
     
     if len(face_rects) == 0:
         previous_proximity += P_CHANGE
@@ -242,7 +252,8 @@ def smooth_face(face_rect):
         smooth_face_counter = (smooth_face_counter + 1) % SMOOTH_FACE_MAX
     
     smoothed_face = np.mean(smooth_face_history, axis=0, dtype=np.int)
-    print "smooth_face_mean: ", smoothed_face
+    if SHOW_DEBUG:
+        print "smooth_face_mean: ", smoothed_face
     
     return smoothed_face
     
@@ -391,9 +402,12 @@ def draw_rect(img, rect, color):
 # Receive: i11 - i33, image arrays, all the same size
 #---------------------------------------------------------------------------------------------------
 def capture_video(i11, i12, i13, i21, i22, i23, i31, i32, i33):
-    if SHOW:
+    if SHOW_SCREEN:
         cv2.imshow('Video Capture', np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
-    vid.write(np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
+    if CAPTURE_VIDEO:
+        vid.write(np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
+    if not MOVE_WINDOW:
+        cv2.moveWindow('Video Capture', ((1280-(CAPTURE_WIDTH*3))/2), 25) # 1280x1024
     
 #---------------------------------------------------------------------------------------------------
 # draw_text() draws the given text on the image at the specified coordinates.
@@ -427,8 +441,8 @@ if __name__ == '__main__':
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_WIDTH, CAPTURE_WIDTH)
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
     
-    if CAPTURE_VIDEO:
-        vid = cv2.VideoWriter("C:\\Users\\nag5\\Documents\\GitHub\\DAS\\captures\\" + str(int(time.time())) + ".mpeg", cv.CV_FOURCC('P','I','M','1'), 30.0, (CAPTURE_WIDTH*3, CAPTURE_HEIGHT*3))
+    # if CAPTURE_VIDEO:
+    vid = cv2.VideoWriter("C:\\Users\\nag5\\Documents\\GitHub\\DAS\\captures\\" + str(int(time.time())) + ".mpeg", cv.CV_FOURCC('P','I','M','1'), 30.0, (CAPTURE_WIDTH*3, CAPTURE_HEIGHT*3))
 
     runtime_sum = 0.0000001 # prevent divide by zero
     counter = 1
@@ -568,8 +582,8 @@ if __name__ == '__main__':
             draw_text(display_alle, 'All Eyes', (20, 20))
             draw_text(display_sf, 'Smoothed Face', (20, 20))
             
-            if CAPTURE_VIDEO:
-                capture_video(display_raw, display_gs, display_eqgs, display_allf, display_alle, display_stats, display_sf, display_lea, display_rea)
+            # if CAPTURE_VIDEO:
+            capture_video(display_raw, display_gs, display_eqgs, display_allf, display_alle, display_stats, display_sf, display_lea, display_rea)
         
         if SHOW_DEBUG:
             print counter, " - Faces: ", faces_found, " -- Eyes: ", eyes_found
@@ -585,8 +599,19 @@ if __name__ == '__main__':
         # it also handles any windowing events, such as creating windows with imshow()
         # http://stackoverflow.com/questions/5217519/opencv-cvwaitkey
         # TODO: Wait for key only if showing images
-        if cv2.waitKey(5) == 27:
+        keyPress = cv2.waitKey(5)
+        if keyPress == 27:
+            print "ESC pressed"
             break
+        if keyPress == 67 or keyPress == 99: # c
+            CAPTURE_VIDEO = not CAPTURE_VIDEO
+            print "Video Record:", CAPTURE_VIDEO
+        if keyPress == 87 or keyPress == 119: # w
+            MOVE_WINDOW = not MOVE_WINDOW
+            print "Window Lock:", not MOVE_WINDOW
+        if keyPress == 80 or keyPress == 112: # p (pause)
+            SHOW_SCREEN = not SHOW_SCREEN
+            print "Show on Screen:", SHOW_SCREEN
         
         # Run set number of tests, displaying the number of completed tests. Works best with debug
         # off.
