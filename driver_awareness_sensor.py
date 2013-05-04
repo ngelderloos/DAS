@@ -47,7 +47,7 @@ SHOW_SCREEN = True
 
 TIMEIT = True               # records time after each part, may slow down process
 
-CAPTURE_VIDEO = True        # records video while running
+CAPTURE_VIDEO = False        # records video while running
 
 MOVE_WINDOW = False         # Allow the window to be moved
 
@@ -156,35 +156,33 @@ def choose_face(face_rects):
         face_rect_array = face_rects[0]
         confidence = 0
         
-        if abs(face_rect_array[X1] - previous_face_rect[X1]) < previous_proximity[X1]:
+        if abs(face_rect_array[X1] - previous_face_rect[X1]) < (previous_proximity[X1] + 5):
             confidence += 1
             previous_proximity[X1] -= P_CHANGE if previous_proximity[X1] >= P_CHANGE else 0
         else:
             confidence -= 1
             previous_proximity[X1] += P_CHANGE if previous_proximity[X1] <= CAPTURE_WIDTH else 0
             
-        if abs(face_rect_array[Y1] - previous_face_rect[Y1]) < previous_proximity[Y1]:
+        if abs(face_rect_array[Y1] - previous_face_rect[Y1]) < (previous_proximity[Y1] + 5):
             confidence += 1
             previous_proximity[Y1] -= P_CHANGE if previous_proximity[Y1] >= P_CHANGE else 0
         else:
             confidence -= 1
             previous_proximity[Y1] += P_CHANGE
         
-        if abs(face_rect_array[X2] - previous_face_rect[X2]) < previous_proximity[X2]:
+        if abs(face_rect_array[X2] - previous_face_rect[X2]) < (previous_proximity[X2] + 5):
             confidence += 1
             previous_proximity[X2] -= P_CHANGE if previous_proximity[X2] >= P_CHANGE else 0
         else:
             confidence -= 1
             previous_proximity[X2] += P_CHANGE
         
-        if abs(face_rect_array[Y2] - previous_face_rect[Y2]) < previous_proximity[Y2]:
+        if abs(face_rect_array[Y2] - previous_face_rect[Y2]) < (previous_proximity[Y2] + 5):
             confidence += 1
             previous_proximity[Y2] -= P_CHANGE if previous_proximity[Y2] >= P_CHANGE else 0
         else:
             confidence -= 1
             previous_proximity[Y2] += P_CHANGE
-        
-        # print "confidence: ", confidence
         
         if confidence >= 0:
             previous_face_rect = face_rect_array
