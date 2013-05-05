@@ -440,7 +440,7 @@ if __name__ == '__main__':
     cam.set(cv2.cv.CV_CAP_PROP_FRAME_HEIGHT, CAPTURE_HEIGHT)
     
     # if CAPTURE_VIDEO:
-    vid = cv2.VideoWriter("C:\\Users\\nag5\\Documents\\GitHub\\DAS\\captures\\" + str(int(time.time())) + ".mpeg", cv.CV_FOURCC('P','I','M','1'), 30.0, (CAPTURE_WIDTH*3, CAPTURE_HEIGHT*3))
+    vid = cv2.VideoWriter(".\\captures\\" + str(int(time.time())) + ".mpeg", cv.CV_FOURCC('P','I','M','1'), 30.0, (CAPTURE_WIDTH*3, CAPTURE_HEIGHT*3))
 
     runtime_sum = 0.0000001 # prevent divide by zero
     counter = 1

@@ -20,3 +20,13 @@
 	
 * Didn't use, but may be useful.
 	1. [http://opencvpython.blogspot.in/2012/05/install-opencv-in-windows-for-python.html](http://opencvpython.blogspot.in/2012/05/install-opencv-in-windows-for-python.html)
+
+    
+## Helpful Commands ##
+
+Press the following keys when the main window (not the terminal) is active.
+
+* c - Toggles the video capture mode on/off. When on, a video file will be saved in the ./captures/ folder.
+* p - Toggles the output to the screen. When paused, the window does not update with current video, though processing still occurs, as well as video capture if it is on.
+* w - Toggles the window lock. The window is initially locked in location to prevent unauthorized movement.
+* ESC - Exits the program.
