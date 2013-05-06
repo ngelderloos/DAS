@@ -573,6 +573,15 @@ if __name__ == '__main__':
                 gray = cv2.flip(gray, 1)
                 # cv2.imshow('Grayscale', gray)
             
+            
+            display_raw = cv2.flip(display_raw, 1)
+            display_gs = cv2.flip(display_gs, 1)
+            display_eqgs = cv2.flip(display_eqgs, 1)
+            display_allf = cv2.flip(display_allf, 1)
+            display_alle = cv2.flip(display_alle, 1)
+            display_sf = cv2.flip(display_sf, 1)
+            
+            
             draw_text(display_raw, 'Raw', (20, 20))
             draw_text(display_gs, 'Grayscale', (20, 20))
             draw_text(display_eqgs, 'Equalized Grayscale', (20, 20))
