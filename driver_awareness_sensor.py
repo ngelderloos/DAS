@@ -1,3 +1,16 @@
+####################################################################################################
+### driver_awareness_sensor.py
+###
+### Author: Nathan Gelderloos
+### Completed: May 7, 2013
+###
+### This file contains the functions to attempt to detect driver awareness and drowsiness based on 
+### the length of the driver's blink. This completed file cannot actually determine drowsiness, 
+### though the blink of most users is noticable on the graphical display, if the user is not moving.
+### For more details, visit the project website: 
+### http://www.calvin.edu/academic/engineering/2012-13-team13/index.html
+####################################################################################################
+
 import numpy as np
 import cv2
 import cv2.cv as cv
@@ -5,12 +18,6 @@ import time
 import numpy as np
 import sys
 import math
-
-#TODO: 
-# * place window in correct spot
-# * generate proper output in console
-# * presentation
-#
 
 ####################################################################################################
 # CONFIGURATION
@@ -23,8 +30,7 @@ FACE_CASCADE_FN = "./data/haarcascades/haarcascade_frontalface_default.xml"
 EYE_CASCADE_FN = "./data/haarcascades/haarcascade_eye.xml"
 
 # camera capture width
-# default is 640
-# possible values seem to be 160, 176, 320, 352, 640
+# default is 640; possible values seem to be 160, 176, 320, 352, 640
 CAPTURE_WIDTH = 320
 
 NUMBER_OF_TESTS = None   # sets the number of frames to grab and process, set to None to disable
@@ -117,10 +123,14 @@ def detect_faces(img, cascade):
     rects[:,2:] += rects[:,:2] # transforms [x1, y1, width, length] into [x1, y1, x2, y2]
     return rects
 
+#---------------------------------------------------------------------------------------------------
+# detect_eyes() uses the given cascade to find the desired features.
+# Receive: img, an image
+#          cascade, the cascade to use to locate the features
+# Return: rects, a list of rectangles, each represended as numpy.ndarray
+#---------------------------------------------------------------------------------------------------
 def detect_eyes(img, cascade):
-    # height = len(img)
     min_eye_size = len(img)/5
-    #TODO? max_eye_size = len(img)/2
     rects = cascade.detectMultiScale(img, scaleFactor=1.5, minNeighbors=4, minSize=(min_eye_size, min_eye_size), flags=cv.CV_HAAR_SCALE_IMAGE)
     if len(rects) == 0:
         return []
@@ -148,10 +158,12 @@ def choose_face(face_rects):
     if SHOW_DEBUG:
         print "previous_proximity: ", previous_proximity
     
+    # return None if no faces are passed
     if len(face_rects) == 0:
         previous_proximity += P_CHANGE
         return None
     
+    # return the face_rect if only one is passed and it is within the desired proximity
     elif len(face_rects) == 1:
         face_rect_array = face_rects[0]
         confidence = 0
@@ -190,6 +202,7 @@ def choose_face(face_rects):
         else:
             return None
     
+    # check all the possible faces and return one if it is within the desired proximity, else return None
     else:
         confidence = np.zeros(len(face_rects))
         counter = 0
@@ -226,10 +239,6 @@ def choose_face(face_rects):
         
         else:
             return None
-        
-    selected_face = face_rects[0]
-    
-    return selected_face
     
 #---------------------------------------------------------------------------------------------------
 # smooth_face() smooths the face rectangle by averaging a set number of previous face rectangles.
@@ -400,11 +409,11 @@ def draw_rect(img, rect, color):
 # Receive: i11 - i33, image arrays, all the same size
 #---------------------------------------------------------------------------------------------------
 def capture_video(i11, i12, i13, i21, i22, i23, i31, i32, i33):
-    if SHOW_SCREEN:
+    if SHOW_SCREEN: # shows processed image on screen
         cv2.imshow('Video Capture', np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
-    if CAPTURE_VIDEO:
+    if CAPTURE_VIDEO: # writes frame to video file
         vid.write(np.vstack((np.hstack((i11, i12, i13)), np.hstack((i21, i22, i23)), np.hstack((i31, i32, i33)))))
-    if not MOVE_WINDOW:
+    if not MOVE_WINDOW: # resets window location to prevent movement
         cv2.moveWindow('Video Capture', ((1280-(CAPTURE_WIDTH*3))/2), 25) # 1280x1024
     
 #---------------------------------------------------------------------------------------------------
@@ -444,7 +453,6 @@ if __name__ == '__main__':
 
     runtime_sum = 0.0000001 # prevent divide by zero
     counter = 1
-    
     color = 0
     
     while True:
@@ -635,4 +643,3 @@ if __name__ == '__main__':
     # End of program messages
     print "Stopped."
     print "Average loop time (ms):", (int(runtime_sum/counter*10000))/10.0, "--> fps:", (int(1/(runtime_sum/counter)*10)/10.0)
-            
